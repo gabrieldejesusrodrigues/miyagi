@@ -1513,7 +1513,8 @@ export function createProgram(): Command {
   program
     .name('miyagi')
     .description('Agent & Skill Trainer for Claude Code')
-    .version('0.1.0');
+    .version('0.1.0')
+    .helpOption('-h, --help', 'Display help for miyagi CLI commands and options');
 
   registerAgentCommands(program);
   registerSkillCommands(program);
@@ -2384,6 +2385,145 @@ git commit -m "feat: wire all remaining CLI commands"
 
 ---
 
+## Phase 13b: Help System
+
+### Task 23b: `miyagi --help` and `/miyagi:help` in-session command
+
+**Files:**
+- Modify: `miyagi/src/cli/program.ts`
+- Create: `miyagi/src/cli/commands/miyagi-help.ts`
+- Test: `miyagi/tests/unit/help.test.ts`
+
+**Step 1: Write failing tests**
+
+```typescript
+// tests/unit/help.test.ts
+import { describe, it, expect } from 'vitest';
+import { createProgram } from '../../src/cli/program.js';
+import { formatInSessionHelp } from '../../src/cli/commands/miyagi-help.js';
+
+describe('miyagi --help (terminal)', () => {
+  it('program has help option enabled', () => {
+    const program = createProgram();
+    const helpInfo = program.helpInformation();
+    expect(helpInfo).toContain('miyagi');
+    expect(helpInfo).toContain('Agent & Skill Trainer for Claude Code');
+    expect(helpInfo).toContain('create');
+    expect(helpInfo).toContain('use');
+    expect(helpInfo).toContain('battle');
+  });
+
+  it('each subcommand has its own --help', () => {
+    const program = createProgram();
+    for (const cmd of program.commands) {
+      const help = cmd.helpInformation();
+      expect(help.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('/miyagi:help (in-session)', () => {
+  it('lists all miyagi in-session commands', () => {
+    const output = formatInSessionHelp('sales-agent', [
+      'discovery', 'objection-handling', 'closing-techniques',
+    ]);
+    expect(output).toContain('/miyagi:help');
+    expect(output).toContain('/miyagi:skills');
+    expect(output).toContain('/miyagi:battle');
+    expect(output).toContain('/miyagi:train');
+    expect(output).toContain('/miyagi:stats');
+    expect(output).toContain('/miyagi:switch');
+    expect(output).toContain('/miyagi:context');
+    expect(output).toContain('/miyagi:identity');
+  });
+
+  it('shows active agent name', () => {
+    const output = formatInSessionHelp('sales-agent', []);
+    expect(output).toContain('sales-agent');
+  });
+
+  it('lists agent skills', () => {
+    const output = formatInSessionHelp('dev-agent', ['tdd', 'debugging']);
+    expect(output).toContain('/tdd');
+    expect(output).toContain('/debugging');
+  });
+
+  it('notes that Claude Code /help still works', () => {
+    const output = formatInSessionHelp('test', []);
+    expect(output).toContain('/help');
+    expect(output).toContain('Claude Code');
+  });
+});
+```
+
+**Step 2: Run tests — verify fail**
+
+```bash
+cd ~/miyagi && pnpm test -- tests/unit/help.test.ts
+```
+
+**Step 3: Implement formatInSessionHelp**
+
+```typescript
+// src/cli/commands/miyagi-help.ts
+
+const MIYAGI_COMMANDS = [
+  { cmd: '/miyagi:help', desc: 'Show this help' },
+  { cmd: '/miyagi:skills', desc: "List this agent's skills" },
+  { cmd: '/miyagi:battle', desc: 'Challenge another agent' },
+  { cmd: '/miyagi:train', desc: 'Trigger coaching analysis' },
+  { cmd: '/miyagi:stats', desc: 'Show agent stats inline' },
+  { cmd: '/miyagi:switch', desc: 'Switch to a different agent' },
+  { cmd: '/miyagi:context', desc: 'Show loaded context files' },
+  { cmd: '/miyagi:identity', desc: 'Show current agent identity summary' },
+] as const;
+
+export function formatInSessionHelp(agentName: string, agentSkills: string[]): string {
+  const lines: string[] = [];
+
+  lines.push('');
+  lines.push('  Miyagi In-Session Commands');
+  lines.push('  ═══════════════════════════════════════');
+  lines.push('');
+  lines.push('  Commands:');
+
+  const maxLen = Math.max(...MIYAGI_COMMANDS.map(c => c.cmd.length));
+  for (const { cmd, desc } of MIYAGI_COMMANDS) {
+    lines.push(`    ${cmd.padEnd(maxLen + 2)} ${desc}`);
+  }
+
+  lines.push('');
+  lines.push(`  Active Agent: ${agentName}`);
+
+  if (agentSkills.length > 0) {
+    lines.push(`  Agent Skills: ${agentSkills.map(s => '/' + s).join(', ')}`);
+  } else {
+    lines.push('  Agent Skills: (none installed)');
+  }
+
+  lines.push('');
+  lines.push('  Claude Code commands (/help, /rewind, /clear, etc.) work as normal.');
+  lines.push('');
+
+  return lines.join('\n');
+}
+```
+
+**Step 4: Run tests — verify pass**
+
+```bash
+cd ~/miyagi && pnpm test -- tests/unit/help.test.ts
+```
+
+**Step 5: Commit**
+
+```bash
+git add src/cli/commands/miyagi-help.ts tests/unit/help.test.ts
+git commit -m "feat: add miyagi --help and /miyagi:help in-session command"
+```
+
+---
+
 ## Phase 14: Integration Testing & Polish
 
 ### Task 24: End-to-end integration tests
@@ -2851,7 +2991,7 @@ Phase 9:  [Task 18] (depends on Task 16)
 Phase 10: [Task 19] (depends on Task 16)
 Phase 11: [Task 20] (depends on Task 4)
 Phase 12: [Task 21] (depends on Tasks 4, 5, 6, 8)
-Phase 13: [Task 22] → [Task 23] (depends on all Phases)
+Phase 13: [Task 22] → [Task 23] → [Task 23b] (depends on all Phases)
 Phase 14: [Task 24] → [Task 25] (final)
 Phase 15: [Task 26] → [Task 27] → [Task 28] (Task 26 independent, can parallel early; 27-28 depend on Task 25)
 Phase 16: [Task 29] (can parallel with Task 26, only needs project scaffolding)

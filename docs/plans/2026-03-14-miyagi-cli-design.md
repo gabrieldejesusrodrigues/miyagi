@@ -147,6 +147,74 @@ miyagi report <agent1> --compare <agent2>   # Side-by-side comparison page
 
 ---
 
+## Help System
+
+Two distinct help surfaces:
+
+### `miyagi --help` (Terminal, before entering a session)
+
+Shows CLI usage, available commands, flags, and options. Standard Commander.js help output:
+
+```
+$ miyagi --help
+
+  Usage: miyagi [command] [options]
+
+  Agent & Skill Trainer for Claude Code
+
+  Options:
+    -V, --version                    output the version number
+    -h, --help                       display help for command
+
+  Commands:
+    create <type> <name> [options]   Create a new agent or skill
+    edit <type> <name>               Edit an agent interactively
+    delete <type> <name>             Delete an agent
+    clone <type> <source> <target>   Clone an agent
+    list <type> [options]            List agents or skills
+    use <agent> [options]            Start a Claude Code session as an agent
+    battle [agent1] [agent2]         Start a battle between two agents
+    train <agent> [options]          Train an agent with Mr. Miyagi coaching
+    stats <agent> [options]          Show agent stats, ELO, and skill radar
+    export <agent> [options]         Export an agent package
+    import <source>                  Import an agent package
+    templates <action> [source]      Manage agent templates
+    report <target> [options]        Generate an HTML report
+    sessions <agent>                 List past sessions for an agent
+    install <type> <source> <agent>  Install a skill into an agent
+    update <type> <agent>            Update skills for an agent
+```
+
+Each subcommand also supports `--help`: `miyagi battle --help`, `miyagi use --help`, etc.
+
+### `/miyagi:help` (In-session, inside a miyagi agent session)
+
+Shows miyagi-specific in-session commands, keybindings, and the active agent's skills. Does NOT overlap with Claude Code's `/help`.
+
+```
+> /miyagi:help
+
+  🥋 Miyagi In-Session Commands
+  ═══════════════════════════════════════
+
+  Commands:
+    /miyagi:help        Show this help
+    /miyagi:skills      List this agent's skills
+    /miyagi:battle      Challenge another agent
+    /miyagi:train       Trigger coaching analysis
+    /miyagi:stats       Show agent stats inline
+    /miyagi:switch      Switch to a different agent
+    /miyagi:context     Show loaded context files
+    /miyagi:identity    Show current agent identity summary
+
+  Active Agent: sales-agent
+  Agent Skills: /discovery, /objection-handling, /closing-techniques
+
+  Claude Code commands (/help, /rewind, /clear, etc.) work as normal.
+```
+
+---
+
 ## Impersonation Mechanism
 
 Hybrid approach — zero file risk, full project context preserved:
@@ -160,7 +228,7 @@ Hybrid approach — zero file risk, full project context preserved:
 ### In-Session Commands
 
 - **Claude Code native (pass through):** `/rewind`, `/resume`, `/clear`, `/compact`, `/model`, `/help`, `/skills`, `/cost`, etc.
-- **Miyagi-prefixed:** `/miyagi-skills`, `/miyagi-battle`, `/miyagi-train`, `/miyagi-stats`, `/miyagi-switch`, `/miyagi-context`, `/miyagi-identity`
+- **Miyagi-prefixed:** `/miyagi:help`, `/miyagi:skills`, `/miyagi:battle`, `/miyagi:train`, `/miyagi:stats`, `/miyagi:switch`, `/miyagi:context`, `/miyagi:identity`
 - **Agent skills (unprefixed):** `/discovery`, `/objection-handling`, etc. — unique names that won't collide
 
 ---
