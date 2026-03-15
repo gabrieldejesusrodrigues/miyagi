@@ -2387,38 +2387,98 @@ git commit -m "feat: wire all remaining CLI commands"
 
 ## Phase 13b: Help System
 
-### Task 23b: `miyagi --help` and `/miyagi:help` in-session command
+### Task 23b: `miyagi --help`, Claude Code flag pass-through, and `/miyagi:help` in-session command
+
+Miyagi must support **all Claude Code CLI flags** as pass-through. Any flag that `claude` accepts also works with `miyagi`. Miyagi-specific commands are handled internally; unrecognized commands and all Claude Code flags are forwarded to the underlying `claude` process.
 
 **Files:**
 - Modify: `miyagi/src/cli/program.ts`
 - Create: `miyagi/src/cli/commands/miyagi-help.ts`
+- Create: `miyagi/src/core/claude-flags.ts`
 - Test: `miyagi/tests/unit/help.test.ts`
+- Test: `miyagi/tests/unit/claude-flags.test.ts`
 
 **Step 1: Write failing tests**
+
+```typescript
+// tests/unit/claude-flags.test.ts
+import { describe, it, expect } from 'vitest';
+import { parseArgs, CLAUDE_FLAGS } from '../../src/core/claude-flags.js';
+
+describe('Claude Code flag pass-through', () => {
+  it('recognizes all major claude flags', () => {
+    expect(CLAUDE_FLAGS).toContain('--model');
+    expect(CLAUDE_FLAGS).toContain('--print');
+    expect(CLAUDE_FLAGS).toContain('--resume');
+    expect(CLAUDE_FLAGS).toContain('--continue');
+    expect(CLAUDE_FLAGS).toContain('--dangerously-skip-permissions');
+    expect(CLAUDE_FLAGS).toContain('--append-system-prompt');
+    expect(CLAUDE_FLAGS).toContain('--permission-mode');
+    expect(CLAUDE_FLAGS).toContain('--effort');
+    expect(CLAUDE_FLAGS).toContain('--worktree');
+    expect(CLAUDE_FLAGS).toContain('--mcp-config');
+    expect(CLAUDE_FLAGS).toContain('--allowedTools');
+    expect(CLAUDE_FLAGS).toContain('--disallowedTools');
+    expect(CLAUDE_FLAGS).toContain('--add-dir');
+    expect(CLAUDE_FLAGS).toContain('--debug');
+    expect(CLAUDE_FLAGS).toContain('--verbose');
+    expect(CLAUDE_FLAGS).toContain('--output-format');
+    expect(CLAUDE_FLAGS).toContain('--input-format');
+    expect(CLAUDE_FLAGS).toContain('--system-prompt');
+    expect(CLAUDE_FLAGS).toContain('--json-schema');
+    expect(CLAUDE_FLAGS).toContain('--max-budget-usd');
+    expect(CLAUDE_FLAGS).toContain('--name');
+    expect(CLAUDE_FLAGS).toContain('--session-id');
+  });
+
+  it('separates miyagi args from claude pass-through args', () => {
+    const { miyagiArgs, claudeArgs } = parseArgs([
+      'use', 'sales-agent', '--model', 'opus', '--effort', 'high',
+    ]);
+    expect(miyagiArgs).toEqual(['use', 'sales-agent']);
+    expect(claudeArgs).toEqual(['--model', 'opus', '--effort', 'high']);
+  });
+
+  it('keeps miyagi-specific flags with miyagi', () => {
+    const { miyagiArgs, claudeArgs } = parseArgs([
+      'battle', 'agent-a', 'agent-b', '--mode', 'debate', '--model', 'opus',
+    ]);
+    expect(miyagiArgs).toEqual(['battle', 'agent-a', 'agent-b', '--mode', 'debate']);
+    expect(claudeArgs).toEqual(['--model', 'opus']);
+  });
+});
+```
 
 ```typescript
 // tests/unit/help.test.ts
 import { describe, it, expect } from 'vitest';
 import { createProgram } from '../../src/cli/program.js';
-import { formatInSessionHelp } from '../../src/cli/commands/miyagi-help.js';
+import { formatInSessionHelp, formatTerminalHelp } from '../../src/cli/commands/miyagi-help.js';
 
 describe('miyagi --help (terminal)', () => {
-  it('program has help option enabled', () => {
-    const program = createProgram();
-    const helpInfo = program.helpInformation();
-    expect(helpInfo).toContain('miyagi');
-    expect(helpInfo).toContain('Agent & Skill Trainer for Claude Code');
-    expect(helpInfo).toContain('create');
-    expect(helpInfo).toContain('use');
-    expect(helpInfo).toContain('battle');
+  it('shows miyagi commands', () => {
+    const output = formatTerminalHelp();
+    expect(output).toContain('Miyagi Commands');
+    expect(output).toContain('create');
+    expect(output).toContain('use');
+    expect(output).toContain('battle');
   });
 
-  it('each subcommand has its own --help', () => {
-    const program = createProgram();
-    for (const cmd of program.commands) {
-      const help = cmd.helpInformation();
-      expect(help.length).toBeGreaterThan(0);
-    }
+  it('shows Claude Code pass-through flags', () => {
+    const output = formatTerminalHelp();
+    expect(output).toContain('Claude Code Options');
+    expect(output).toContain('--model');
+    expect(output).toContain('--resume');
+    expect(output).toContain('--dangerously-skip-permissions');
+    expect(output).toContain('--effort');
+    expect(output).toContain('--worktree');
+  });
+
+  it('separates miyagi and claude sections clearly', () => {
+    const output = formatTerminalHelp();
+    const miyagiIdx = output.indexOf('Miyagi Commands');
+    const claudeIdx = output.indexOf('Claude Code Options');
+    expect(miyagiIdx).toBeLessThan(claudeIdx);
   });
 });
 
@@ -2462,10 +2522,82 @@ describe('/miyagi:help (in-session)', () => {
 cd ~/miyagi && pnpm test -- tests/unit/help.test.ts
 ```
 
-**Step 3: Implement formatInSessionHelp**
+**Step 3: Implement claude-flags.ts**
+
+```typescript
+// src/core/claude-flags.ts
+
+// All flags supported by claude CLI that miyagi passes through
+export const CLAUDE_FLAGS: string[] = [
+  '--model', '--append-system-prompt', '--system-prompt',
+  '--dangerously-skip-permissions', '--allow-dangerously-skip-permissions',
+  '--permission-mode', '--print', '--continue', '--resume',
+  '--worktree', '--effort', '--mcp-config', '--strict-mcp-config',
+  '--allowedTools', '--allowed-tools', '--disallowedTools', '--disallowed-tools',
+  '--add-dir', '--debug', '--debug-file', '--verbose',
+  '--output-format', '--input-format', '--json-schema',
+  '--max-budget-usd', '--name', '--session-id', '--fork-session',
+  '--agent', '--agents', '--betas', '--brief', '--chrome', '--no-chrome',
+  '--disable-slash-commands', '--fallback-model', '--file',
+  '--from-pr', '--ide', '--include-partial-messages',
+  '--no-session-persistence', '--plugin-dir',
+  '--replay-user-messages', '--setting-sources', '--settings',
+  '--tmux', '--tools',
+];
+
+// Short aliases that map to claude flags
+export const CLAUDE_SHORT_FLAGS: Record<string, string> = {
+  '-p': '--print',
+  '-c': '--continue',
+  '-r': '--resume',
+  '-w': '--worktree',
+  '-d': '--debug',
+  '-n': '--name',
+};
+
+// Flags that take a value argument
+export const CLAUDE_FLAGS_WITH_VALUE = new Set([
+  '--model', '--append-system-prompt', '--system-prompt',
+  '--permission-mode', '--effort', '--mcp-config',
+  '--allowedTools', '--allowed-tools', '--disallowedTools', '--disallowed-tools',
+  '--add-dir', '--debug', '--debug-file', '--output-format', '--input-format',
+  '--json-schema', '--max-budget-usd', '--name', '--session-id',
+  '--agent', '--agents', '--betas', '--fallback-model', '--file',
+  '--from-pr', '--plugin-dir', '--setting-sources', '--settings', '--tools',
+]);
+
+const CLAUDE_FLAG_SET = new Set([...CLAUDE_FLAGS, ...Object.keys(CLAUDE_SHORT_FLAGS)]);
+
+export function parseArgs(args: string[]): { miyagiArgs: string[]; claudeArgs: string[] } {
+  const miyagiArgs: string[] = [];
+  const claudeArgs: string[] = [];
+  let i = 0;
+
+  while (i < args.length) {
+    const arg = args[i];
+    const longFlag = CLAUDE_SHORT_FLAGS[arg] ?? arg;
+
+    if (CLAUDE_FLAG_SET.has(arg)) {
+      claudeArgs.push(arg);
+      if (CLAUDE_FLAGS_WITH_VALUE.has(longFlag) && i + 1 < args.length) {
+        i++;
+        claudeArgs.push(args[i]);
+      }
+    } else {
+      miyagiArgs.push(arg);
+    }
+    i++;
+  }
+
+  return { miyagiArgs, claudeArgs };
+}
+```
+
+**Step 4: Implement miyagi-help.ts**
 
 ```typescript
 // src/cli/commands/miyagi-help.ts
+import { CLAUDE_FLAGS } from '../../core/claude-flags.js';
 
 const MIYAGI_COMMANDS = [
   { cmd: '/miyagi:help', desc: 'Show this help' },
@@ -2477,6 +2609,63 @@ const MIYAGI_COMMANDS = [
   { cmd: '/miyagi:context', desc: 'Show loaded context files' },
   { cmd: '/miyagi:identity', desc: 'Show current agent identity summary' },
 ] as const;
+
+const CLAUDE_FLAG_DESCRIPTIONS: Array<{ flag: string; desc: string }> = [
+  { flag: '--model <model>', desc: 'Model for the session (sonnet, opus, etc.)' },
+  { flag: '--effort <level>', desc: 'Effort level (low, medium, high, max)' },
+  { flag: '-p, --print', desc: 'Print response and exit' },
+  { flag: '-c, --continue', desc: 'Continue most recent conversation' },
+  { flag: '-r, --resume [id]', desc: 'Resume a conversation by session ID' },
+  { flag: '-w, --worktree [name]', desc: 'Create a git worktree for the session' },
+  { flag: '--dangerously-skip-permissions', desc: 'Bypass all permission checks' },
+  { flag: '--permission-mode <mode>', desc: 'Permission mode (acceptEdits, default, etc.)' },
+  { flag: '--append-system-prompt <p>', desc: 'Append to system prompt' },
+  { flag: '--mcp-config <configs...>', desc: 'Load MCP servers from JSON files' },
+  { flag: '--allowedTools <tools...>', desc: 'Tools to allow' },
+  { flag: '--disallowedTools <tools...>', desc: 'Tools to deny' },
+  { flag: '--add-dir <dirs...>', desc: 'Additional directories for tool access' },
+  { flag: '-d, --debug [filter]', desc: 'Enable debug mode' },
+  { flag: '-n, --name <name>', desc: 'Set session display name' },
+  { flag: '--output-format <fmt>', desc: 'Output format (text, json, stream-json)' },
+  { flag: '--max-budget-usd <amt>', desc: 'Maximum dollar spend on API calls' },
+  { flag: '--verbose', desc: 'Override verbose mode setting' },
+];
+
+export function formatTerminalHelp(): string {
+  const lines: string[] = [];
+
+  lines.push('');
+  lines.push('  Usage: miyagi [command] [options] [prompt]');
+  lines.push('');
+  lines.push('  Agent & Skill Trainer for Claude Code');
+  lines.push('');
+  lines.push('  Miyagi Commands:');
+  lines.push('    create <type> <name> [options]    Create a new agent or skill');
+  lines.push('    edit <type> <name>                Edit an agent interactively');
+  lines.push('    delete <type> <name>              Delete an agent');
+  lines.push('    clone <type> <source> <target>    Clone an agent');
+  lines.push('    list <type> [options]             List agents or skills');
+  lines.push('    use <agent> [options]             Start a Claude Code session as an agent');
+  lines.push('    battle [agent1] [agent2]          Start a battle between two agents');
+  lines.push('    train <agent> [options]           Train an agent with Mr. Miyagi coaching');
+  lines.push('    stats <agent> [options]           Show agent stats, ELO, and skill radar');
+  lines.push('    export <agent> [options]          Export an agent package');
+  lines.push('    import <source>                   Import an agent package');
+  lines.push('    templates <action> [source]       Manage agent templates');
+  lines.push('    report <target> [options]         Generate an HTML report');
+  lines.push('    sessions <agent>                  List past sessions for an agent');
+  lines.push('    install <type> <source> <agent>   Install a skill into an agent');
+  lines.push('    update <type> <agent>             Update skills for an agent');
+  lines.push('');
+  lines.push('  Claude Code Options (all supported as pass-through):');
+  for (const { flag, desc } of CLAUDE_FLAG_DESCRIPTIONS) {
+    lines.push(`    ${flag.padEnd(38)} ${desc}`);
+  }
+  lines.push('    ... and all other claude CLI flags');
+  lines.push('');
+
+  return lines.join('\n');
+}
 
 export function formatInSessionHelp(agentName: string, agentSkills: string[]): string {
   const lines: string[] = [];
@@ -2509,17 +2698,17 @@ export function formatInSessionHelp(agentName: string, agentSkills: string[]): s
 }
 ```
 
-**Step 4: Run tests — verify pass**
+**Step 5: Run tests — verify pass**
 
 ```bash
-cd ~/miyagi && pnpm test -- tests/unit/help.test.ts
+cd ~/miyagi && pnpm test -- tests/unit/help.test.ts tests/unit/claude-flags.test.ts
 ```
 
-**Step 5: Commit**
+**Step 6: Commit**
 
 ```bash
-git add src/cli/commands/miyagi-help.ts tests/unit/help.test.ts
-git commit -m "feat: add miyagi --help and /miyagi:help in-session command"
+git add src/core/claude-flags.ts src/cli/commands/miyagi-help.ts tests/unit/help.test.ts tests/unit/claude-flags.test.ts
+git commit -m "feat: add miyagi --help with Claude Code flag pass-through and /miyagi:help in-session command"
 ```
 
 ---

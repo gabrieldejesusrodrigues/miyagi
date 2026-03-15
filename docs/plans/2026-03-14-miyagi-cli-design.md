@@ -153,20 +153,16 @@ Two distinct help surfaces:
 
 ### `miyagi --help` (Terminal, before entering a session)
 
-Shows CLI usage, available commands, flags, and options. Standard Commander.js help output:
+Shows CLI usage, available commands, flags, and options. Miyagi supports **all Claude Code CLI flags** as pass-through — any flag you can pass to `claude` also works with `miyagi`. Miyagi adds its own commands on top.
 
 ```
 $ miyagi --help
 
-  Usage: miyagi [command] [options]
+  Usage: miyagi [command] [options] [prompt]
 
   Agent & Skill Trainer for Claude Code
 
-  Options:
-    -V, --version                    output the version number
-    -h, --help                       display help for command
-
-  Commands:
+  Miyagi Commands:
     create <type> <name> [options]   Create a new agent or skill
     edit <type> <name>               Edit an agent interactively
     delete <type> <name>             Delete an agent
@@ -183,7 +179,36 @@ $ miyagi --help
     sessions <agent>                 List past sessions for an agent
     install <type> <source> <agent>  Install a skill into an agent
     update <type> <agent>            Update skills for an agent
+
+  Claude Code Commands (pass-through):
+    auth                             Manage authentication
+    doctor                           Check auto-updater health
+    mcp                              Configure MCP servers
+
+  Miyagi Options:
+    -V, --version                    Output miyagi version number
+    -h, --help                       Display this help
+
+  Claude Code Options (all supported as pass-through):
+    --model <model>                  Model for the session (sonnet, opus, etc.)
+    --append-system-prompt <prompt>  Append to system prompt
+    --dangerously-skip-permissions   Bypass all permission checks
+    --permission-mode <mode>         Permission mode (acceptEdits, default, etc.)
+    -p, --print                      Print response and exit
+    -c, --continue                   Continue most recent conversation
+    -r, --resume [value]             Resume a conversation by session ID
+    -w, --worktree [name]            Create a git worktree for the session
+    --effort <level>                 Effort level (low, medium, high, max)
+    --mcp-config <configs...>        Load MCP servers from JSON files
+    --allowedTools <tools...>        Tools to allow
+    --disallowedTools <tools...>     Tools to deny
+    --add-dir <directories...>       Additional directories for tool access
+    -d, --debug [filter]             Enable debug mode
+    -n, --name <name>                Set session display name
+    ... and all other claude CLI flags
 ```
+
+Miyagi detects whether a flag is miyagi-specific or a Claude Code flag. Miyagi-specific commands are handled internally; unrecognized commands and all Claude Code flags are forwarded to the underlying `claude` process.
 
 Each subcommand also supports `--help`: `miyagi battle --help`, `miyagi use --help`, etc.
 
