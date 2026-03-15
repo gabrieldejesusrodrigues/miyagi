@@ -2425,25 +2425,317 @@ git commit -m "chore: prepare for npm publishing"
 
 ---
 
+## Phase 15: CI/CD & npm Publishing
+
+### Task 26: GitHub Actions CI pipeline
+
+**Files:**
+- Create: `miyagi/.github/workflows/ci.yml`
+- Create: `miyagi/.github/workflows/release.yml`
+
+**Step 1: Create CI workflow**
+
+```yaml
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test -- --coverage
+      - uses: actions/upload-artifact@v4
+        if: matrix.node-version == 20
+        with:
+          name: coverage
+          path: coverage/
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+```
+
+**Step 2: Create release workflow**
+
+```yaml
+# .github/workflows/release.yml
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+```
+
+**Step 3: Commit**
+
+```bash
+git add .github/
+git commit -m "ci: add CI pipeline and release workflow"
+```
+
+---
+
+### Task 27: npm package configuration
+
+**Files:**
+- Modify: `miyagi/package.json`
+- Create: `miyagi/.npmignore`
+- Create: `miyagi/LICENSE`
+
+**Step 1: Finalize package.json for publishing**
+
+```json
+{
+  "name": "miyagi",
+  "version": "0.1.0",
+  "description": "Agent & Skill Trainer for Claude Code — create, battle, and coach AI agents",
+  "type": "module",
+  "bin": {
+    "miyagi": "./dist/bin/miyagi.js"
+  },
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "files": [
+    "dist/",
+    "src/builtin-agents/",
+    "src/templates/",
+    "src/reports/templates/",
+    "src/reports/assets/",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "pnpm build",
+    "release:patch": "npm version patch && git push --follow-tags",
+    "release:minor": "npm version minor && git push --follow-tags",
+    "release:major": "npm version major && git push --follow-tags"
+  },
+  "keywords": [
+    "cli",
+    "claude",
+    "claude-code",
+    "ai-agent",
+    "agent-training",
+    "skills",
+    "miyagi",
+    "llm"
+  ],
+  "author": "Gabriel de Jesus Rodrigues",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gabrieldejesusrodrigues/miyagi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gabrieldejesusrodrigues/miyagi/issues"
+  },
+  "homepage": "https://github.com/gabrieldejesusrodrigues/miyagi#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/claude-code": ">=2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/claude-code": {
+      "optional": true
+    }
+  }
+}
+```
+
+**Step 2: Create .npmignore**
+
+```
+# Source & dev files
+src/
+tests/
+tsconfig.json
+tsup.config.ts
+vitest.config.ts
+.github/
+.gitignore
+.eslintrc*
+.prettierrc*
+coverage/
+*.tgz
+
+# Keep these (override .gitignore)
+!dist/
+!src/builtin-agents/
+!src/templates/
+!src/reports/templates/
+!src/reports/assets/
+```
+
+**Step 3: Create LICENSE (MIT)**
+
+Standard MIT license with Gabriel de Jesus Rodrigues as copyright holder.
+
+**Step 4: Verify package contents**
+
+```bash
+cd ~/miyagi && npm pack --dry-run
+```
+
+Verify the output includes only dist/, builtin-agents, templates, report assets, LICENSE, README.
+
+**Step 5: Test global install from tarball**
+
+```bash
+cd ~/miyagi && npm pack
+npm install -g ./miyagi-0.1.0.tgz
+miyagi --version
+miyagi --help
+npm uninstall -g miyagi
+```
+
+**Step 6: Commit**
+
+```bash
+git add package.json .npmignore LICENSE
+git commit -m "chore: configure npm package for publishing"
+```
+
+---
+
+### Task 28: Release process documentation
+
+**Files:**
+- Add release section to README.md (created in Task 25)
+
+**Step 1:** Document the release process:
+
+```markdown
+## Releasing
+
+1. Update CHANGELOG.md
+2. Bump version: `pnpm release:patch` (or `:minor` / `:major`)
+3. Git tag is created and pushed automatically
+4. GitHub Actions runs tests, builds, and publishes to npm
+5. GitHub Release is created with auto-generated notes
+
+### First-time setup
+
+1. Create npm account at npmjs.com
+2. Generate npm access token (Automation type)
+3. Add `NPM_TOKEN` secret to GitHub repo settings
+```
+
+**Step 2: Commit**
+
+```bash
+git commit -m "docs: add release process documentation"
+```
+
+---
+
 ## Task Dependency Graph
 
 ```
-Phase 1: [Task 1] → [Task 2]
-Phase 2: [Task 3] → [Task 4] → [Task 5] → [Task 6] → [Task 7]
-Phase 3: [Task 8] (depends on Phase 2)
-Phase 4: [Task 9] (depends on Tasks 4, 6, 7)
-Phase 5: [Task 10] → [Task 11] → [Task 12] (depends on Task 6)
-Phase 6: [Task 13] → [Task 14] (depends on Tasks 10, 11)
-Phase 7: [Task 15] → [Task 16] (depends on Task 13)
-Phase 8: [Task 17] (independent, can parallel with Phase 5-7)
-Phase 9: [Task 18] (depends on Task 16)
+Phase 1:  [Task 1] → [Task 2]
+Phase 2:  [Task 3] → [Task 4] → [Task 5] → [Task 6] → [Task 7]
+Phase 3:  [Task 8] (depends on Phase 2)
+Phase 4:  [Task 9] (depends on Tasks 4, 6, 7)
+Phase 5:  [Task 10] → [Task 11] → [Task 12] (depends on Task 6)
+Phase 6:  [Task 13] → [Task 14] (depends on Tasks 10, 11)
+Phase 7:  [Task 15] → [Task 16] (depends on Task 13)
+Phase 8:  [Task 17] (independent, can parallel with Phase 5-7)
+Phase 9:  [Task 18] (depends on Task 16)
 Phase 10: [Task 19] (depends on Task 16)
 Phase 11: [Task 20] (depends on Task 4)
 Phase 12: [Task 21] (depends on Tasks 4, 5, 6, 8)
 Phase 13: [Task 22] → [Task 23] (depends on all Phases)
 Phase 14: [Task 24] → [Task 25] (final)
+Phase 15: [Task 26] → [Task 27] → [Task 28] (Task 26 independent, can parallel early; 27-28 depend on Task 25)
 ```
 
 Parallelizable groups:
 - Tasks 17, 19, 20 can run in parallel once their dependencies are met
 - Tasks 10-12 can be developed alongside Tasks 13-16 on separate branches
+- Task 26 (CI pipeline) can be created early alongside Phase 1-2 since it only needs project scaffolding
