@@ -2715,6 +2715,127 @@ git commit -m "docs: add release process documentation"
 
 ---
 
+## Phase 16: Security Scanning
+
+### Task 29: Security audit pipeline
+
+**Files:**
+- Modify: `miyagi/.github/workflows/ci.yml`
+- Create: `miyagi/.github/workflows/security.yml`
+
+**Step 1: Create dedicated security workflow**
+
+```yaml
+# .github/workflows/security.yml
+name: Security
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly Monday 6am UTC
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Audit dependencies
+        run: pnpm audit --audit-level=high
+      - name: Check for known vulnerabilities
+        run: npx better-npm-audit audit --level high
+
+  codeql:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: typescript
+      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/analyze@v3
+
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
+
+  import-security-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Run import security tests
+        run: pnpm test -- tests/unit/archive-security.test.ts --reporter=verbose
+      - name: Run all security-related tests
+        run: pnpm test -- --grep "security|traversal|symlink|sanitiz" --reporter=verbose
+```
+
+**Step 2: Add security check to CI workflow**
+
+Add to the existing `ci.yml` after the test job:
+
+```yaml
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level=high
+```
+
+**Step 3: Add security test script to package.json**
+
+```json
+{
+  "scripts": {
+    "test:security": "vitest run --grep 'security|traversal|symlink|sanitiz'"
+  }
+}
+```
+
+**Step 4: Commit**
+
+```bash
+git add .github/ package.json
+git commit -m "ci: add security scanning pipeline with CodeQL, dependency audit, and secrets detection"
+```
+
+---
+
 ## Task Dependency Graph
 
 ```
@@ -2733,9 +2854,10 @@ Phase 12: [Task 21] (depends on Tasks 4, 5, 6, 8)
 Phase 13: [Task 22] → [Task 23] (depends on all Phases)
 Phase 14: [Task 24] → [Task 25] (final)
 Phase 15: [Task 26] → [Task 27] → [Task 28] (Task 26 independent, can parallel early; 27-28 depend on Task 25)
+Phase 16: [Task 29] (can parallel with Task 26, only needs project scaffolding)
 ```
 
 Parallelizable groups:
 - Tasks 17, 19, 20 can run in parallel once their dependencies are met
 - Tasks 10-12 can be developed alongside Tasks 13-16 on separate branches
-- Task 26 (CI pipeline) can be created early alongside Phase 1-2 since it only needs project scaffolding
+- Tasks 26, 29 (CI + security pipelines) can be created early alongside Phase 1-2 since they only need project scaffolding
