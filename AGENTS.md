@@ -2,6 +2,8 @@
 
 Multi-agent development guide for the Miyagi CLI project.
 
+**Architecture:** See [ARCHITECTURE.md](./ARCHITECTURE.md) for layer diagrams, data flows, type system, filesystem layout, and the full battle/impersonation pipelines.
+
 ## Project Overview
 
 Miyagi is an npm-installable CLI that wraps Claude Code to provide agent creation, skill management, battle training, and coaching. TypeScript, ESM-only, Node >= 18.
