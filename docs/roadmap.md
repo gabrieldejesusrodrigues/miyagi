@@ -45,7 +45,7 @@
 - [x] Task 20: Built-in agent templates
 
 ## Phase 12: Interactive Agent/Skill Creation
-- [ ] Task 21: AI-assisted interactive agent creation
+- [x] Task 21: AI-assisted interactive agent creation
 
 ## Phase 13: Wire Everything Together
 - [x] Task 22: Wire battle command end-to-end
@@ -53,13 +53,13 @@
 - [x] Task 23b: Help system with Claude Code flag pass-through
 
 ## Phase 14: Integration Testing & Polish
-- [ ] Task 24: End-to-end integration tests
-- [ ] Task 25: Package for npm publishing
+- [x] Task 24: End-to-end integration tests
+- [x] Task 25: Package for npm publishing
 
 ## Phase 15: CI/CD & npm Publishing
 - [x] Task 26: GitHub Actions CI pipeline
-- [ ] Task 27: npm package configuration
-- [ ] Task 28: Release process documentation
+- [x] Task 27: npm package configuration
+- [x] Task 28: Release process documentation
 
 ## Phase 16: Security Scanning
-- [ ] Task 29: Security audit pipeline
+- [x] Task 29: Security audit pipeline
