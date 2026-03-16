@@ -59,14 +59,14 @@ export class ClaudeBridge {
       args.push('--dangerously-skip-permissions');
     }
 
-    args.push('--append-system-prompt', options.systemPrompt);
+    // Claude CLI hangs when --append-system-prompt contains newlines
+    args.push('--append-system-prompt', options.systemPrompt.replace(/\n+/g, ' '));
 
     if (options.model) {
       args.push('--model', options.model);
     }
 
-    args.push(options.prompt);
-
+    // Prompt is passed via stdin in runAndCapture, not as a positional arg
     return args;
   }
 
@@ -84,12 +84,17 @@ export class ClaudeBridge {
     });
   }
 
-  async runAndCapture(args: string[], timeout: number = 300_000): Promise<string> {
+  async runAndCapture(args: string[], timeout: number = 300_000, stdinData?: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = this.spawnNonInteractive(args);
       let stdout = '';
       let stderr = '';
       let killed = false;
+
+      if (stdinData) {
+        child.stdin?.write(stdinData);
+        child.stdin?.end();
+      }
 
       const timer = setTimeout(() => {
         killed = true;

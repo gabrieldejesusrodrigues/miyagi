@@ -105,8 +105,8 @@ export class BattleEngine {
       const argsB = bridge.buildBattleArgs({ systemPrompt: identityB, prompt: taskPrompt });
 
       const [agentAResponse, agentBResponse] = await Promise.all([
-        bridge.runAndCapture(argsA),
-        bridge.runAndCapture(argsB),
+        bridge.runAndCapture(argsA, undefined, taskPrompt),
+        bridge.runAndCapture(argsB, undefined, taskPrompt),
       ]);
 
       rounds.push({ round, agentAResponse, agentBResponse, timestamp: new Date().toISOString() });
@@ -140,6 +140,8 @@ export class BattleEngine {
       const turnPromptA = mediator.buildTurnPrompt(rolePrompts.agentA, history, round, config.maxRounds);
       const responseA = await bridge.runAndCapture(
         bridge.buildBattleArgs({ systemPrompt: identityA, prompt: turnPromptA }),
+        undefined,
+        turnPromptA,
       );
       history.push({ role: config.agentA, content: responseA });
 
@@ -152,6 +154,8 @@ export class BattleEngine {
       const turnPromptB = mediator.buildTurnPrompt(rolePrompts.agentB, history, round, config.maxRounds);
       const responseB = await bridge.runAndCapture(
         bridge.buildBattleArgs({ systemPrompt: identityB, prompt: turnPromptB }),
+        undefined,
+        turnPromptB,
       );
       history.push({ role: config.agentB, content: responseB });
 

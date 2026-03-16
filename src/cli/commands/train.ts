@@ -75,7 +75,7 @@ export function registerTrainCommand(program: Command): void {
         });
 
         console.log('Mr. Miyagi is analyzing...');
-        const rawResponse = await bridge.runAndCapture(coachArgs);
+        const rawResponse = await bridge.runAndCapture(coachArgs, undefined, coachingPrompt);
         const coachingResult = coach.parseCoachingResponse(rawResponse);
 
         if (options.dryRun) {

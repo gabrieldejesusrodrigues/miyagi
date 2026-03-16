@@ -87,7 +87,7 @@ export function registerBattleCommand(program: Command): void {
           prompt: evalPrompt,
           model: 'opus',
         });
-        const verdictRaw = await bridge.runAndCapture(judgeArgs);
+        const verdictRaw = await bridge.runAndCapture(judgeArgs, undefined, evalPrompt);
         const verdict = judge.parseVerdict(verdictRaw);
 
         // Print verdict
