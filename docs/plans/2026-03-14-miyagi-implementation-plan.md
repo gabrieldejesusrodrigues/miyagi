@@ -12,6 +12,27 @@
 
 ---
 
+## IMPORTANT: Use Latest Library Versions
+
+**Before installing ANY dependency**, you MUST search the web (npm registry, GitHub releases, or official docs) to find the **latest stable version** of each library. Do NOT rely on versions from your training data — they are likely outdated.
+
+For each dependency:
+1. Search `https://www.npmjs.com/package/<package-name>` to find the current latest version
+2. Install with the exact latest version: `pnpm add <package>@latest`
+3. Check for breaking changes between the version you know and the latest version
+4. If the API has changed, read the official migration guide or docs before using it
+
+This applies to ALL dependencies including but not limited to:
+- `commander`, `inquirer`, `chalk`, `ora`, `ink`
+- `simple-git`, `handlebars`, `tar`, `archiver`
+- `typescript`, `vitest`, `tsup`
+- `chart.js`, `@types/*` packages
+- Any GitHub Actions used in CI/CD workflows (use latest major versions)
+
+**Why:** LLM training data has a knowledge cutoff and package versions evolve. Using outdated versions leads to deprecation warnings, security vulnerabilities, and incompatible APIs. Always verify against the live npm registry.
+
+---
+
 ## Phase 1: Project Scaffolding & Core Types
 
 ### Task 1: Initialize project and build toolchain
