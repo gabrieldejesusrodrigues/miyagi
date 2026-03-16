@@ -21,15 +21,15 @@
 
 ## Phase 5: Battle System
 - [x] Task 10: Battle engine core — symmetric battles
-- [ ] Task 11: Battle mediator — asymmetric battles
-- [ ] Task 12: Remaining battle modes
+- [x] Task 11: Battle mediator — asymmetric battles
+- [x] Task 12: Remaining battle modes
 
 ## Phase 6: Judge & Coach
 - [ ] Task 13: Judge agent — analysis and scoring
 - [ ] Task 14: Coach (Mr. Miyagi) — training and improvements
 
 ## Phase 7: Scoring System
-- [ ] Task 15: ELO calculator and dimensional scoring
+- [x] Task 15: ELO calculator and dimensional scoring
 - [ ] Task 16: Training history manager
 
 ## Phase 8: Import/Export Security
@@ -42,7 +42,7 @@
 - [ ] Task 19: Report design system and templates
 
 ## Phase 11: Agent Templates
-- [ ] Task 20: Built-in agent templates
+- [x] Task 20: Built-in agent templates
 
 ## Phase 12: Interactive Agent/Skill Creation
 - [ ] Task 21: AI-assisted interactive agent creation
