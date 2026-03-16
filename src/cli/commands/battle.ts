@@ -6,7 +6,7 @@ import { getModeConfig } from '../../battle/modes/index.js';
 import { ClaudeBridge } from '../../core/claude-bridge.js';
 import { Judge } from '../../training/judge.js';
 import { HistoryManager } from '../../training/history.js';
-import type { BattleMode } from '../../types/index.js';
+import type { BattleMode, JudgeVerdict } from '../../types/index.js';
 
 export function registerBattleCommand(program: Command): void {
   program
@@ -90,10 +90,24 @@ export function registerBattleCommand(program: Command): void {
           model: 'opus',
           effort: ['high', 'max'].includes(effort) ? effort : 'medium',
         };
-        const verdictRaw = await bridge.runAndCapture(
-          bridge.buildBattleArgs(judgeOpts), 600_000, bridge.buildBattleStdin(judgeOpts),
-        );
-        const verdict = judge.parseVerdict(verdictRaw);
+        let verdictRaw = '';
+        let verdict!: JudgeVerdict;
+        const maxRetries = 2;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          verdictRaw = await bridge.runAndCapture(
+            bridge.buildBattleArgs(judgeOpts), 600_000, bridge.buildBattleStdin(judgeOpts),
+          );
+          try {
+            verdict = judge.parseVerdict(verdictRaw);
+            break;
+          } catch (parseErr) {
+            if (attempt < maxRetries) {
+              console.log(`Judge response could not be parsed (attempt ${attempt}/${maxRetries}), retrying...`);
+            } else {
+              throw parseErr;
+            }
+          }
+        }
 
         // Print verdict
         console.log('\n--- Judge Verdict ---');

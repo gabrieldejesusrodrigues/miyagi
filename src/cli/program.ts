@@ -9,6 +9,7 @@ import { registerExportImportCommands } from './commands/export-import.js';
 import { registerTemplatesCommand } from './commands/templates.js';
 import { registerReportCommand } from './commands/report.js';
 import { registerSessionsCommand } from './commands/sessions.js';
+import { formatTerminalHelp } from './commands/miyagi-help.js';
 
 export function createProgram(): Command {
   const program = new Command();
@@ -38,6 +39,14 @@ export function createProgram(): Command {
   registerTemplatesCommand(program);
   registerReportCommand(program);
   registerSessionsCommand(program);
+
+  // Override Commander's default 'help' command with custom detailed help
+  program
+    .command('help')
+    .description('Display detailed help for miyagi CLI')
+    .action(() => {
+      console.log(formatTerminalHelp());
+    });
 
   return program;
 }
