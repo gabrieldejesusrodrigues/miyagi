@@ -124,13 +124,22 @@ export function registerAgentCommands(program: Command): void {
 
       if (type === 'agents') {
         const agents = await agentManager.list();
-        if (agents.length === 0) {
+        const templateLoader = new TemplateLoader();
+        const templates = templateLoader.list();
+
+        if (agents.length === 0 && templates.length === 0) {
           console.log('No agents found.');
           return;
         }
         console.log('Agents:');
         for (const agent of agents) {
           console.log(`  ${agent.name.padEnd(20)} [${agent.scope}] ${agent.manifest.description ?? ''}`);
+        }
+        if (templates.length > 0) {
+          console.log('\nTemplates (use --template to create):');
+          for (const t of templates) {
+            console.log(`  ${t.name.padEnd(20)} [template] ${t.description}`);
+          }
         }
       } else if (type === 'skills' && options.agent) {
         const skillManager = new SkillManager(agentManager);
