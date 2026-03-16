@@ -14,7 +14,7 @@
 - [x] Task 7: Session manager
 
 ## Phase 3: CLI Command Routing
-- [ ] Task 8: Commander program setup with all command stubs
+- [x] Task 8: Commander program setup with all command stubs
 
 ## Phase 4: Agent Impersonation
 - [ ] Task 9: `miyagi use` — impersonate agent with skill symlinks
