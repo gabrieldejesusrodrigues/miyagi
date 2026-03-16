@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import type { JudgeVerdict } from '../types/index.js';
@@ -88,5 +88,30 @@ export class Coach {
 
     const identity = readFileSync(agent.identityPath, 'utf-8');
     return { identity, context: [] };
+  }
+
+  async applyChanges(agentName: string, result: CoachingResult): Promise<void> {
+    const agent = await this.agentManager.get(agentName);
+    if (!agent) throw new Error(`Agent "${agentName}" not found`);
+
+    for (const change of result.changes) {
+      if (change.file === 'identity.md' && change.action === 'modify') {
+        let identity = readFileSync(agent.identityPath, 'utf-8');
+        const sectionRegex = new RegExp(`(## ${change.section}\\n)([\\s\\S]*?)(?=\\n## |$)`);
+        if (sectionRegex.test(identity)) {
+          identity = identity.replace(sectionRegex, `$1\n${change.content}\n`);
+        } else {
+          identity += `\n## ${change.section}\n\n${change.content}\n`;
+        }
+        writeFileSync(agent.identityPath, identity);
+      } else if (change.action === 'add' && change.file.startsWith('context/')) {
+        const filePath = join(agent.contextDir, change.file.replace('context/', ''));
+        writeFileSync(filePath, change.content);
+      } else if (change.action === 'add' && change.file.startsWith('skills/')) {
+        const skillDir = join(agent.skillsDir, change.file.replace('skills/', '').split('/')[0]);
+        if (!existsSync(skillDir)) mkdirSync(skillDir, { recursive: true });
+        writeFileSync(join(skillDir, 'SKILL.md'), change.content);
+      }
+    }
   }
 }
