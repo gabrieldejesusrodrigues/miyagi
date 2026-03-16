@@ -13,6 +13,7 @@ interface BattleAgentOptions {
   prompt: string;
   dangerouslySkipPermissions?: boolean;
   model?: string;
+  effort?: string;
 }
 
 export class ClaudeBridge {
@@ -59,15 +60,21 @@ export class ClaudeBridge {
       args.push('--dangerously-skip-permissions');
     }
 
-    // Claude CLI hangs when --append-system-prompt contains newlines
-    args.push('--append-system-prompt', options.systemPrompt.replace(/\n+/g, ' '));
-
     if (options.model) {
       args.push('--model', options.model);
     }
 
-    // Prompt is passed via stdin in runAndCapture, not as a positional arg
+    if (options.effort) {
+      args.push('--effort', options.effort);
+    }
+
+    // System prompt is embedded in stdin via buildBattleStdin to avoid
+    // CLI argument length issues that cause Claude to hang
     return args;
+  }
+
+  buildBattleStdin(options: BattleAgentOptions): string {
+    return `<SYSTEM_PROMPT>\n${options.systemPrompt}\n</SYSTEM_PROMPT>\n\n${options.prompt}`;
   }
 
   spawnInteractive(args: string[]): ChildProcess {

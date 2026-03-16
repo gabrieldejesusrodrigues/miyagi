@@ -35,8 +35,9 @@ describe('ClaudeBridge', () => {
     });
 
     expect(args).toContain('--print');
-    expect(args).toContain('--append-system-prompt');
     expect(args).toContain('--dangerously-skip-permissions');
+    // System prompt embedded in stdin via buildBattleStdin
+    expect(args).not.toContain('--append-system-prompt');
   });
 
   it('finds claude binary path', () => {

@@ -101,12 +101,12 @@ export class BattleEngine {
           `Continue and improve on the above.`;
       }
 
-      const argsA = bridge.buildBattleArgs({ systemPrompt: identityA, prompt: taskPrompt });
-      const argsB = bridge.buildBattleArgs({ systemPrompt: identityB, prompt: taskPrompt });
+      const optsA = { systemPrompt: identityA, prompt: taskPrompt };
+      const optsB = { systemPrompt: identityB, prompt: taskPrompt };
 
       const [agentAResponse, agentBResponse] = await Promise.all([
-        bridge.runAndCapture(argsA, undefined, taskPrompt),
-        bridge.runAndCapture(argsB, undefined, taskPrompt),
+        bridge.runAndCapture(bridge.buildBattleArgs(optsA), undefined, bridge.buildBattleStdin(optsA)),
+        bridge.runAndCapture(bridge.buildBattleArgs(optsB), undefined, bridge.buildBattleStdin(optsB)),
       ]);
 
       rounds.push({ round, agentAResponse, agentBResponse, timestamp: new Date().toISOString() });
@@ -138,10 +138,9 @@ export class BattleEngine {
 
     for (let round = 1; round <= config.maxRounds; round++) {
       const turnPromptA = mediator.buildTurnPrompt(rolePrompts.agentA, history, round, config.maxRounds);
+      const optsA = { systemPrompt: identityA, prompt: turnPromptA };
       const responseA = await bridge.runAndCapture(
-        bridge.buildBattleArgs({ systemPrompt: identityA, prompt: turnPromptA }),
-        undefined,
-        turnPromptA,
+        bridge.buildBattleArgs(optsA), undefined, bridge.buildBattleStdin(optsA),
       );
       history.push({ role: config.agentA, content: responseA });
 
@@ -152,10 +151,9 @@ export class BattleEngine {
       }
 
       const turnPromptB = mediator.buildTurnPrompt(rolePrompts.agentB, history, round, config.maxRounds);
+      const asymOptsB = { systemPrompt: identityB, prompt: turnPromptB };
       const responseB = await bridge.runAndCapture(
-        bridge.buildBattleArgs({ systemPrompt: identityB, prompt: turnPromptB }),
-        undefined,
-        turnPromptB,
+        bridge.buildBattleArgs(asymOptsB), undefined, bridge.buildBattleStdin(asymOptsB),
       );
       history.push({ role: config.agentB, content: responseB });
 

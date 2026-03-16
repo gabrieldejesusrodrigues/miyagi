@@ -79,15 +79,18 @@ export function registerBattleCommand(program: Command): void {
         }
 
         // Judge evaluation
-        console.log('\nRunning judge evaluation...');
+        console.log('\nRunning judge evaluation (this may take a few minutes with opus)...');
         const judge = new Judge();
         const evalPrompt = judge.buildEvaluationPrompt(result);
-        const judgeArgs = bridge.buildBattleArgs({
+        const judgeOpts = {
           systemPrompt: judge.getIdentity(),
           prompt: evalPrompt,
           model: 'opus',
-        });
-        const verdictRaw = await bridge.runAndCapture(judgeArgs, undefined, evalPrompt);
+          effort: 'medium',
+        };
+        const verdictRaw = await bridge.runAndCapture(
+          bridge.buildBattleArgs(judgeOpts), 600_000, bridge.buildBattleStdin(judgeOpts),
+        );
         const verdict = judge.parseVerdict(verdictRaw);
 
         // Print verdict

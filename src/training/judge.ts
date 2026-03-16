@@ -40,7 +40,7 @@ export class Judge {
     }
 
     prompt += `\nTermination reason: ${result.terminationReason}\n`;
-    prompt += `\nProvide your evaluation as a JSON object.`;
+    prompt += `\nProvide your evaluation as a compact JSON object. Be concise — keep narrative under 200 words and each analysis field under 100 words. Output ONLY the JSON, no markdown fences.`;
 
     return prompt;
   }

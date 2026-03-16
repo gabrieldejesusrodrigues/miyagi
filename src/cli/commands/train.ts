@@ -69,13 +69,16 @@ export function registerTrainCommand(program: Command): void {
         coachingPrompt += `Provide coaching changes as a JSON object with this structure:\n`;
         coachingPrompt += `{ "changes": [{ "file": "identity.md", "section": "Strategy", "action": "modify", "content": "...", "reason": "..." }], "summary": "...", "focusAreas": [...], "expectedImprovement": "..." }`;
 
-        const coachArgs = bridge.buildBattleArgs({
+        const coachOpts = {
           systemPrompt: coachIdentity,
           prompt: coachingPrompt,
-        });
+          effort: 'medium',
+        };
 
-        console.log('Mr. Miyagi is analyzing...');
-        const rawResponse = await bridge.runAndCapture(coachArgs, undefined, coachingPrompt);
+        console.log('Mr. Miyagi is analyzing (this may take a few minutes)...');
+        const rawResponse = await bridge.runAndCapture(
+          bridge.buildBattleArgs(coachOpts), 600_000, bridge.buildBattleStdin(coachOpts),
+        );
         const coachingResult = coach.parseCoachingResponse(rawResponse);
 
         if (options.dryRun) {

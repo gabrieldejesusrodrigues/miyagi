@@ -76,13 +76,18 @@ describe('ClaudeBridge', () => {
       expect(args[0]).toBe('--print');
     });
 
-    it('should include system prompt (prompt passed via stdin)', () => {
+    it('should pass system prompt and user prompt via buildBattleStdin', () => {
       const bridge = new ClaudeBridge('echo');
-      const args = bridge.buildBattleArgs({ systemPrompt: 'sys prompt', prompt: 'user prompt' });
-      expect(args).toContain('--append-system-prompt');
-      expect(args).toContain('sys prompt');
-      // prompt is passed via stdin in runAndCapture, not in args
-      expect(args).not.toContain('user prompt');
+      const opts = { systemPrompt: 'sys prompt', prompt: 'user prompt' };
+      const args = bridge.buildBattleArgs(opts);
+      // System prompt is embedded in stdin, not CLI args
+      expect(args).not.toContain('--append-system-prompt');
+      expect(args).not.toContain('sys prompt');
+      const stdin = bridge.buildBattleStdin(opts);
+      expect(stdin).toContain('<SYSTEM_PROMPT>');
+      expect(stdin).toContain('sys prompt');
+      expect(stdin).toContain('</SYSTEM_PROMPT>');
+      expect(stdin).toContain('user prompt');
     });
 
     it('should add dangerouslySkipPermissions flag', () => {
