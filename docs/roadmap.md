@@ -25,12 +25,12 @@
 - [x] Task 12: Remaining battle modes
 
 ## Phase 6: Judge & Coach
-- [ ] Task 13: Judge agent — analysis and scoring
-- [ ] Task 14: Coach (Mr. Miyagi) — training and improvements
+- [x] Task 13: Judge agent — analysis and scoring
+- [x] Task 14: Coach (Mr. Miyagi) — training and improvements
 
 ## Phase 7: Scoring System
 - [x] Task 15: ELO calculator and dimensional scoring
-- [ ] Task 16: Training history manager
+- [x] Task 16: Training history manager
 
 ## Phase 8: Import/Export Security
 - [x] Task 17: Secure archive handling
@@ -39,7 +39,7 @@
 - [ ] Task 18: Terminal stats rendering
 
 ## Phase 10: HTML Reports
-- [ ] Task 19: Report design system and templates
+- [x] Task 19: Report design system and templates
 
 ## Phase 11: Agent Templates
 - [x] Task 20: Built-in agent templates
