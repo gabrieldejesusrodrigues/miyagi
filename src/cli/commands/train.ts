@@ -28,13 +28,19 @@ export function registerTrainCommand(program: Command): void {
       }
 
       if (options.revert) {
-        const git = simpleGit(agent.rootDir);
-        const log = await git.log({ maxCount: 1 });
-        if (log.latest && log.latest.message.startsWith('miyagi: coach training')) {
-          await git.revert(log.latest.hash, ['--no-edit']);
-          console.log('Coaching changes reverted.');
-        } else {
-          console.log('No coaching changes to revert.');
+        try {
+          const git = simpleGit(agent.rootDir);
+          const log = await git.log({ maxCount: 1 });
+          if (log.latest && log.latest.message.startsWith('miyagi: coach training')) {
+            await git.revert(log.latest.hash, ['--no-edit']);
+            console.log('Coaching changes reverted.');
+          } else {
+            console.log('No coaching changes to revert.');
+          }
+        } catch {
+          console.error('Cannot revert: agent directory is not a git repository.');
+          console.error('Initialize with "git init" in the agent directory to enable revert.');
+          process.exit(1);
         }
         return;
       }
