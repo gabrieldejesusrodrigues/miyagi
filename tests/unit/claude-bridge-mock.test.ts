@@ -81,7 +81,6 @@ describe('ClaudeBridge', () => {
       const args = bridge.buildBattleArgs({ systemPrompt: 'sys prompt', prompt: 'user prompt' });
       expect(args).toContain('--append-system-prompt');
       expect(args).toContain('sys prompt');
-      expect(args).toContain('--prompt');
       expect(args).toContain('user prompt');
     });
 

@@ -92,7 +92,7 @@ describe('SkillManager (mocked execSync)', () => {
       });
 
       await expect(skillManager.install('bad-skill', 'test-agent')).rejects.toThrow(
-        'npx install failed',
+        'Failed to install skill "bad-skill". Verify the skill source is valid.',
       );
     });
   });
@@ -179,7 +179,8 @@ describe('SkillManager (mocked execSync)', () => {
         throw new Error('update failed');
       });
 
-      await expect(skillManager.updateAll('test-agent')).rejects.toThrow('update failed');
+      // updateAll now catches errors per-skill and logs them instead of throwing
+      await expect(skillManager.updateAll('test-agent')).resolves.not.toThrow();
     });
   });
 });
