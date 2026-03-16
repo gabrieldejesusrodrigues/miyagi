@@ -1,7 +1,12 @@
 import { randomUUID } from 'crypto';
+import { readFileSync } from 'fs';
 import type {
   BattleConfig, BattleMode, BattleRound, BattleResult,
 } from '../types/index.js';
+import type { AgentManager } from '../core/agent-manager.js';
+import type { ClaudeBridge } from '../core/claude-bridge.js';
+import { BattleMediator } from './mediator.js';
+import { getModeConfig } from './modes/index.js';
 
 const VALID_MODES: Set<string> = new Set([
   'same-task', 'code-challenge', 'iterative-refinement', 'speed-run',
@@ -66,5 +71,98 @@ export class BattleEngine {
       endedAt: new Date().toISOString(),
       terminationReason,
     };
+  }
+
+  async runSymmetric(
+    config: BattleConfig,
+    agentManager: AgentManager,
+    bridge: ClaudeBridge,
+  ): Promise<BattleResult> {
+    const agentA = await agentManager.get(config.agentA);
+    const agentB = await agentManager.get(config.agentB);
+    if (!agentA) throw new Error(`Agent "${config.agentA}" not found`);
+    if (!agentB) throw new Error(`Agent "${config.agentB}" not found`);
+
+    const identityA = readFileSync(agentA.identityPath, 'utf-8');
+    const identityB = readFileSync(agentB.identityPath, 'utf-8');
+
+    const rounds: BattleRound[] = [];
+
+    for (let round = 1; round <= config.maxRounds; round++) {
+      let taskPrompt: string;
+      if (round === 1) {
+        taskPrompt = config.task ?? config.topic ?? 'Complete the task.';
+      } else {
+        const prev = rounds[round - 2];
+        taskPrompt = `${config.task ?? config.topic ?? 'Complete the task.'}\n\n` +
+          `Previous round output:\n` +
+          `${config.agentA}: ${prev.agentAResponse}\n` +
+          `${config.agentB}: ${prev.agentBResponse}\n\n` +
+          `Continue and improve on the above.`;
+      }
+
+      const argsA = bridge.buildBattleArgs({ systemPrompt: identityA, prompt: taskPrompt });
+      const argsB = bridge.buildBattleArgs({ systemPrompt: identityB, prompt: taskPrompt });
+
+      const [agentAResponse, agentBResponse] = await Promise.all([
+        bridge.runAndCapture(argsA),
+        bridge.runAndCapture(argsB),
+      ]);
+
+      rounds.push({ round, agentAResponse, agentBResponse, timestamp: new Date().toISOString() });
+    }
+
+    return this.assembleResult(config, rounds, 'round-limit');
+  }
+
+  async runAsymmetric(
+    config: BattleConfig,
+    agentManager: AgentManager,
+    bridge: ClaudeBridge,
+  ): Promise<BattleResult> {
+    const agentA = await agentManager.get(config.agentA);
+    const agentB = await agentManager.get(config.agentB);
+    if (!agentA) throw new Error(`Agent "${config.agentA}" not found`);
+    if (!agentB) throw new Error(`Agent "${config.agentB}" not found`);
+
+    const identityA = readFileSync(agentA.identityPath, 'utf-8');
+    const identityB = readFileSync(agentB.identityPath, 'utf-8');
+
+    const mediator = new BattleMediator();
+    const modeConfig = getModeConfig(config.mode);
+    const rolePrompts = mediator.buildRolePrompts(modeConfig, config.topic ?? config.task);
+
+    const history: { role: string; content: string }[] = [];
+    const rounds: BattleRound[] = [];
+    let terminationReason: BattleResult['terminationReason'] = 'round-limit';
+
+    for (let round = 1; round <= config.maxRounds; round++) {
+      const turnPromptA = mediator.buildTurnPrompt(rolePrompts.agentA, history, round, config.maxRounds);
+      const responseA = await bridge.runAndCapture(
+        bridge.buildBattleArgs({ systemPrompt: identityA, prompt: turnPromptA }),
+      );
+      history.push({ role: config.agentA, content: responseA });
+
+      if (mediator.isNaturalEnd(responseA)) {
+        rounds.push({ round, agentAResponse: responseA, agentBResponse: '', timestamp: new Date().toISOString() });
+        terminationReason = 'natural';
+        break;
+      }
+
+      const turnPromptB = mediator.buildTurnPrompt(rolePrompts.agentB, history, round, config.maxRounds);
+      const responseB = await bridge.runAndCapture(
+        bridge.buildBattleArgs({ systemPrompt: identityB, prompt: turnPromptB }),
+      );
+      history.push({ role: config.agentB, content: responseB });
+
+      rounds.push({ round, agentAResponse: responseA, agentBResponse: responseB, timestamp: new Date().toISOString() });
+
+      if (mediator.isNaturalEnd(responseB)) {
+        terminationReason = 'natural';
+        break;
+      }
+    }
+
+    return this.assembleResult(config, rounds, terminationReason);
   }
 }

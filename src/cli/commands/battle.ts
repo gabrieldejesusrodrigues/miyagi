@@ -3,6 +3,9 @@ import { ConfigManager } from '../../core/config.js';
 import { AgentManager } from '../../core/agent-manager.js';
 import { BattleEngine } from '../../battle/engine.js';
 import { getModeConfig } from '../../battle/modes/index.js';
+import { ClaudeBridge } from '../../core/claude-bridge.js';
+import { Judge } from '../../training/judge.js';
+import { HistoryManager } from '../../training/history.js';
 import type { BattleMode } from '../../types/index.js';
 
 export function registerBattleCommand(program: Command): void {
@@ -54,7 +57,67 @@ export function registerBattleCommand(program: Command): void {
       console.log(`Rounds: ${battleConfig.maxRounds}`);
       console.log(`Battle ID: ${battleConfig.id}`);
 
-      // TODO: Full battle execution with ClaudeBridge spawning
-      console.log('\nBattle execution requires live Claude API. Use miyagi with --dangerously-skip-permissions for automated battles.');
+      try {
+        const bridge = new ClaudeBridge();
+        const history = new HistoryManager(agentManager);
+
+        console.log('\nStarting battle...');
+
+        const result = modeConfig.type === 'symmetric'
+          ? await engine.runSymmetric(battleConfig, agentManager, bridge)
+          : await engine.runAsymmetric(battleConfig, agentManager, bridge);
+
+        // Print round summaries
+        console.log(`\n--- Battle Complete (${result.terminationReason}) ---`);
+        for (const round of result.rounds) {
+          console.log(`\nRound ${round.round}:`);
+          const previewA = result.config.agentA;
+          const previewB = result.config.agentB;
+          console.log(`  ${previewA}: ${round.agentAResponse.slice(0, 120).replace(/\n/g, ' ')}...`);
+          if (round.agentBResponse) {
+            console.log(`  ${previewB}: ${round.agentBResponse.slice(0, 120).replace(/\n/g, ' ')}...`);
+          }
+        }
+
+        // Judge evaluation
+        console.log('\nRunning judge evaluation...');
+        const judge = new Judge();
+        const evalPrompt = judge.buildEvaluationPrompt(result);
+        const judgeArgs = bridge.buildBattleArgs({
+          systemPrompt: judge.getIdentity(),
+          prompt: evalPrompt,
+          model: 'opus',
+        });
+        const verdictRaw = await bridge.runAndCapture(judgeArgs);
+        const verdict = judge.parseVerdict(verdictRaw);
+
+        // Print verdict
+        console.log('\n--- Judge Verdict ---');
+        console.log(`Winner: ${verdict.winner}`);
+        console.log(`Reason: ${verdict.reason}`);
+        if (verdict.comparativeAnalysis) {
+          console.log(`\nAnalysis: ${verdict.comparativeAnalysis}`);
+        }
+        if (verdict.agentAAnalysis?.dimensionScores) {
+          console.log(`\n${agent1} scores:`, verdict.agentAAnalysis.dimensionScores);
+        }
+        if (verdict.agentBAnalysis?.dimensionScores) {
+          console.log(`${agent2} scores:`, verdict.agentBAnalysis.dimensionScores);
+        }
+
+        // Record battle history for both agents
+        await history.recordBattle(agent1, result);
+        await history.recordBattle(agent2, result);
+
+        // Update stats for both agents
+        await history.updateStats(agent1, result, verdict);
+        await history.updateStats(agent2, result, verdict);
+
+        console.log(`\nBattle ID: ${battleConfig.id}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`\nBattle failed: ${message}`);
+        process.exit(1);
+      }
     });
 }
