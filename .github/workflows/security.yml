@@ -26,8 +26,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Audit dependencies
         run: pnpm audit --audit-level=high
-      - name: Check for known vulnerabilities
-        run: npx better-npm-audit audit --level high
 
   codeql:
     runs-on: ubuntu-latest
