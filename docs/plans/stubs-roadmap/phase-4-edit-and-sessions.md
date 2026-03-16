@@ -5,6 +5,8 @@
 > **Gaps addressed:** GAP-2 (sessions never recorded), GAP-18 (edit stub)
 > **Independent of:** Phases 2–3 (can run in parallel)
 
+**Status: COMPLETED**
+
 ---
 
 ## Task 4.1: Implement the edit agent command (GAP-18)
@@ -22,10 +24,10 @@
 5. Future enhancement (out of scope): AI-assisted editing via Claude session
 
 **Acceptance criteria:**
-- [ ] `miyagi edit agent dev` opens `identity.md` in the user's editor
-- [ ] After saving and closing, user sees confirmation
-- [ ] Missing agent produces a clear error
-- [ ] Missing `$EDITOR` falls back to a default editor
+- [x] `miyagi edit agent dev` opens `identity.md` in the user's editor
+- [x] After saving and closing, user sees confirmation
+- [x] Missing agent produces a clear error
+- [x] Missing `$EDITOR` falls back to a default editor
 
 ---
 
@@ -43,6 +45,6 @@
 4. Add a session duration display to `miyagi sessions <agent>` output
 
 **Acceptance criteria:**
-- [ ] After `miyagi use dev` and closing the session, `miyagi sessions dev` shows the session
-- [ ] Session entry includes agent name, session ID, start time, and duration
-- [ ] Multiple sessions are listed in reverse chronological order
+- [x] After `miyagi use dev` and closing the session, `miyagi sessions dev` shows the session
+- [x] Session entry includes agent name, session ID, start time, and duration
+- [x] Multiple sessions are listed in reverse chronological order

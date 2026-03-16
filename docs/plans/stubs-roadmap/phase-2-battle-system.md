@@ -5,6 +5,8 @@
 > **Gaps addressed:** GAP-17 (battle stub), GAP-7 (zip import)
 > **Depends on:** Phase 1 (bug fixes)
 
+**Status: COMPLETED**
+
 The battle command currently validates inputs, creates a config, then prints a TODO message. This phase wires up the full execution pipeline: spawn Claude processes, collect responses, run the Judge, and record results.
 
 ---
@@ -31,9 +33,9 @@ The battle command currently validates inputs, creates a config, then prints a T
    - Save battle result via `history.recordBattle()`
 
 **Acceptance criteria:**
-- [ ] `miyagi battle dev1 dev2 --mode same-task --task "Write a hello world"` runs two Claude processes and prints outputs
-- [ ] Battle result is saved to `history/battles.json`
-- [ ] Battle ID is printed for future reference
+- [x] `miyagi battle dev1 dev2 --mode same-task --task "Write a hello world"` runs two Claude processes and prints outputs
+- [x] Battle result is saved to `history/battles.json`
+- [x] Battle ID is printed for future reference
 
 ---
 
@@ -59,9 +61,9 @@ The battle command currently validates inputs, creates a config, then prints a T
 3. `mediator.ts`: helper that formats the turn context (previous messages) into a prompt string
 
 **Acceptance criteria:**
-- [ ] `miyagi battle dev1 dev2 --mode debate --topic "tabs vs spaces"` runs multi-turn exchange
-- [ ] Each round shows both agents' responses
-- [ ] Conversation context carries between rounds
+- [x] `miyagi battle dev1 dev2 --mode debate --topic "tabs vs spaces"` runs multi-turn exchange
+- [x] Each round shows both agents' responses
+- [x] Conversation context carries between rounds
 
 ---
 
@@ -84,9 +86,9 @@ The battle command currently validates inputs, creates a config, then prints a T
 2. Add `--model` option to battle command to control which Claude model judges use (default: opus)
 
 **Acceptance criteria:**
-- [ ] Battle ends with a verdict printed to terminal
-- [ ] Verdict includes winner, reason, and per-agent scores
-- [ ] Verdict is persisted in battle history
+- [x] Battle ends with a verdict printed to terminal
+- [x] Verdict includes winner, reason, and per-agent scores
+- [x] Verdict is persisted in battle history
 
 ---
 
@@ -103,6 +105,6 @@ The battle command currently validates inputs, creates a config, then prints a T
 3. For `.tar.gz`, use existing `tar.extract()` path
 
 **Acceptance criteria:**
-- [ ] `miyagi import agent.zip` works correctly
-- [ ] `miyagi import agent.tar.gz` still works
-- [ ] Error message for unsupported formats is clear
+- [x] `miyagi import agent.zip` works correctly
+- [x] `miyagi import agent.tar.gz` still works
+- [x] Error message for unsupported formats is clear

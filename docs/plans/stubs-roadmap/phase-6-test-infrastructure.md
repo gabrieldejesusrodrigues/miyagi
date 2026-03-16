@@ -4,6 +4,8 @@
 > **Scope:** 4+ new test files, ~400 lines
 > **Depends on:** Phase 5 (robustness fixes should land first)
 
+**Status: COMPLETED**
+
 The project has unit tests for pure functions but no mock infrastructure for testing process-spawning code or CLI command integration. This phase adds that.
 
 ---
@@ -24,9 +26,9 @@ The project has unit tests for pure functions but no mock infrastructure for tes
 3. Test `buildSessionArgs()` and `buildBattleArgs()` (these are pure — no mock needed)
 
 **Acceptance criteria:**
-- [ ] All three `runAndCapture` scenarios tested
-- [ ] Args builders tested with various option combinations
-- [ ] Tests pass in CI
+- [x] All three `runAndCapture` scenarios tested
+- [x] Args builders tested with various option combinations
+- [x] Tests pass in CI
 
 ---
 
@@ -49,9 +51,9 @@ The project has unit tests for pure functions but no mock infrastructure for tes
    - Error cases: missing args, invalid agent name
 
 **Acceptance criteria:**
-- [ ] At least 5 CLI commands tested end-to-end
-- [ ] Tests use temp directory (no side effects on real `~/.miyagi/`)
-- [ ] Error cases produce correct exit codes
+- [x] At least 5 CLI commands tested end-to-end
+- [x] Tests use temp directory (no side effects on real `~/.miyagi/`)
+- [x] Error cases produce correct exit codes
 
 ---
 
@@ -72,8 +74,8 @@ The project has unit tests for pure functions but no mock infrastructure for tes
    - Handles empty installed-skills list
 
 **Acceptance criteria:**
-- [ ] Install and update flows tested without real process spawning
-- [ ] Error paths tested (agent not found, exec failure)
+- [x] Install and update flows tested without real process spawning
+- [x] Error paths tested (agent not found, exec failure)
 
 ---
 
@@ -94,9 +96,9 @@ The project has unit tests for pure functions but no mock infrastructure for tes
    - Verify context files are appended
 
 **Acceptance criteria:**
-- [ ] Symlink creation/removal tested
-- [ ] System prompt assembly tested
-- [ ] Tests clean up temp directories
+- [x] Symlink creation/removal tested
+- [x] System prompt assembly tested
+- [x] Tests clean up temp directories
 
 ---
 

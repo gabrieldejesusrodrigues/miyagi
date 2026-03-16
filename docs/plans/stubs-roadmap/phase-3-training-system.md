@@ -5,6 +5,8 @@
 > **Gaps addressed:** GAP-17 (train stub)
 > **Depends on:** Phase 2 (needs battle results to coach from)
 
+**Status: COMPLETED**
+
 The train command validates the agent and checks for battles, then prints a TODO. This phase implements the full coaching pipeline: read battle history, spawn Claude with coach identity, parse coaching changes, apply them to agent files.
 
 ---
@@ -37,10 +39,10 @@ The train command validates the agent and checks for battles, then prints a TODO
    - Append entry to `history/training-log.md` with date, battle ref, changes summary
 
 **Acceptance criteria:**
-- [ ] `miyagi train dev --dry-run` prints coaching suggestions without modifying files
-- [ ] `miyagi train dev` applies changes to identity.md and/or context files
-- [ ] Changes are logged in `training-log.md`
-- [ ] Training without prior battles still shows the "no battles" message
+- [x] `miyagi train dev --dry-run` prints coaching suggestions without modifying files
+- [x] `miyagi train dev` applies changes to identity.md and/or context files
+- [x] Changes are logged in `training-log.md`
+- [x] Training without prior battles still shows the "no battles" message
 
 ---
 
@@ -60,9 +62,9 @@ The train command validates the agent and checks for battles, then prints a TODO
 2. Coaching commits should use a consistent prefix: `miyagi: coach training <date>`
 
 **Acceptance criteria:**
-- [ ] `miyagi train dev --revert` undoes the last coaching session
-- [ ] Reverting when no coaching has happened shows a clear message
-- [ ] Reverted changes are reflected in agent files
+- [x] `miyagi train dev --revert` undoes the last coaching session
+- [x] Reverting when no coaching has happened shows a clear message
+- [x] Reverted changes are reflected in agent files
 
 ---
 
@@ -82,6 +84,6 @@ The train command validates the agent and checks for battles, then prints a TODO
 2. Ensure `miyagi stats <agent>` reflects updated values
 
 **Acceptance criteria:**
-- [ ] After a battle, both agents' ELO values change
-- [ ] `miyagi stats dev` shows updated battle count and ELO
-- [ ] Dimension scores from judge are recorded in stats history
+- [x] After a battle, both agents' ELO values change
+- [x] `miyagi stats dev` shows updated battle count and ELO
+- [x] Dimension scores from judge are recorded in stats history

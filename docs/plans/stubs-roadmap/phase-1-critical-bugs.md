@@ -4,7 +4,11 @@
 > **Scope:** 6 source files, ~50 lines changed
 > **Gaps addressed:** GAP-3, GAP-4, GAP-6, GAP-8, GAP-9
 
+**Status: COMPLETED**
+
 These are bugs that will crash the CLI under normal usage. Fix them before building new features.
+
+> **Note:** All tasks in this phase were already fixed in the codebase before the roadmap was created.
 
 ---
 
@@ -25,10 +29,10 @@ These are bugs that will crash the CLI under normal usage. Fix them before build
 4. Replace all raw `JSON.parse(readFileSync(...))` calls with the safe utility
 
 **Acceptance criteria:**
-- [ ] Corrupted `config.json` produces a clear error message with file path
-- [ ] Corrupted `stats.json` returns default stats instead of crashing
-- [ ] Corrupted `.installed-skills.json` returns empty array instead of crashing
-- [ ] Unit tests cover each corrupted-file scenario
+- [x] Corrupted `config.json` produces a clear error message with file path
+- [x] Corrupted `stats.json` returns default stats instead of crashing
+- [x] Corrupted `.installed-skills.json` returns empty array instead of crashing
+- [x] Unit tests cover each corrupted-file scenario
 
 ---
 
@@ -44,8 +48,8 @@ These are bugs that will crash the CLI under normal usage. Fix them before build
 2. Match the pattern already used in `getStats()` and `recordBattle()`
 
 **Acceptance criteria:**
-- [ ] `updateStats('nonexistent')` throws `"Agent not found"` instead of `TypeError`
-- [ ] `addCoachNote('nonexistent', ...)` throws `"Agent not found"` instead of `TypeError`
+- [x] `updateStats('nonexistent')` throws `"Agent not found"` instead of `TypeError`
+- [x] `addCoachNote('nonexistent', ...)` throws `"Agent not found"` instead of `TypeError`
 
 ---
 
@@ -60,8 +64,8 @@ These are bugs that will crash the CLI under normal usage. Fix them before build
 1. Replace `agentDir.split('/').pop()!` with `path.basename(agentDir)` (already imported)
 
 **Acceptance criteria:**
-- [ ] `exportAgent('/path/to/agent/')` (trailing slash) works correctly
-- [ ] Agent name is correctly extracted in both export formats
+- [x] `exportAgent('/path/to/agent/')` (trailing slash) works correctly
+- [x] Agent name is correctly extracted in both export formats
 
 ---
 
@@ -79,9 +83,9 @@ These are bugs that will crash the CLI under normal usage. Fix them before build
 4. Skip entries that don't have a manifest (log a debug warning)
 
 **Acceptance criteria:**
-- [ ] `.DS_Store` in agents directory doesn't crash `miyagi list agents`
-- [ ] Non-agent subdirectory is silently skipped
-- [ ] Valid agents still listed correctly
+- [x] `.DS_Store` in agents directory doesn't crash `miyagi list agents`
+- [x] Non-agent subdirectory is silently skipped
+- [x] Valid agents still listed correctly
 
 ---
 
@@ -98,6 +102,6 @@ These are bugs that will crash the CLI under normal usage. Fix them before build
 3. The `create skill` handler should call the skill creation flow from the design doc
 
 **Acceptance criteria:**
-- [ ] `miyagi edit skill foo` prints `"Unknown type"` error and exits 1
-- [ ] `miyagi delete skill foo` prints `"Unknown type"` error and exits 1
-- [ ] `miyagi clone skill foo bar` prints `"Unknown type"` error and exits 1
+- [x] `miyagi edit skill foo` prints `"Unknown type"` error and exits 1
+- [x] `miyagi delete skill foo` prints `"Unknown type"` error and exits 1
+- [x] `miyagi clone skill foo bar` prints `"Unknown type"` error and exits 1

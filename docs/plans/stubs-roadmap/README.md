@@ -7,14 +7,14 @@ This folder contains the implementation plan for all stub commands, unfinished f
 
 ## Phases Overview
 
-| Phase | Focus | Files | Priority |
-|-------|-------|-------|----------|
-| [Phase 1](./phase-1-critical-bugs.md) | Critical bug fixes (GAP-3, GAP-4, GAP-6, GAP-8, GAP-9) | 6 files | **P0 — Do first** |
-| [Phase 2](./phase-2-battle-system.md) | Battle execution end-to-end (GAP-17) | 4 files | **P1 — Core feature** |
-| [Phase 3](./phase-3-training-system.md) | Train command + coaching pipeline (GAP-17) | 3 files | **P1 — Core feature** |
-| [Phase 4](./phase-4-edit-and-sessions.md) | Edit agent command + session recording (GAP-2, GAP-18) | 2 files | **P2 — UX gaps** |
-| [Phase 5](./phase-5-robustness.md) | Validators, parsing, error handling (GAP-3, GAP-5, GAP-10, GAP-12–16) | 8 files | **P2 — Reliability** |
-| [Phase 6](./phase-6-test-infrastructure.md) | Mock infrastructure + integration tests | 4+ files | **P3 — Quality** |
+| Phase | Focus | Files | Priority | Status |
+|-------|-------|-------|----------|--------|
+| [Phase 1](./phase-1-critical-bugs.md) | Critical bug fixes (GAP-3, GAP-4, GAP-6, GAP-8, GAP-9) | 6 files | **P0 — Do first** | ✓ COMPLETED |
+| [Phase 2](./phase-2-battle-system.md) | Battle execution end-to-end (GAP-17) | 4 files | **P1 — Core feature** | ✓ COMPLETED |
+| [Phase 3](./phase-3-training-system.md) | Train command + coaching pipeline (GAP-17) | 3 files | **P1 — Core feature** | ✓ COMPLETED |
+| [Phase 4](./phase-4-edit-and-sessions.md) | Edit agent command + session recording (GAP-2, GAP-18) | 2 files | **P2 — UX gaps** | ✓ COMPLETED |
+| [Phase 5](./phase-5-robustness.md) | Validators, parsing, error handling (GAP-3, GAP-5, GAP-10, GAP-12–16) | 8 files | **P2 — Reliability** | ✓ COMPLETED |
+| [Phase 6](./phase-6-test-infrastructure.md) | Mock infrastructure + integration tests | 4+ files | **P3 — Quality** | ✓ COMPLETED |
 
 ## Dependency Graph
 

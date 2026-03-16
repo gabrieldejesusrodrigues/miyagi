@@ -5,6 +5,8 @@
 > **Gaps addressed:** GAP-5, GAP-10, GAP-11, GAP-12, GAP-13, GAP-14, GAP-15, GAP-16
 > **Independent of:** Phases 2–4 (can run in parallel)
 
+**Status: COMPLETED**
+
 These are non-crashing bugs and maintainability issues that affect reliability under edge cases.
 
 ---
@@ -24,8 +26,8 @@ These are non-crashing bugs and maintainability issues that affect reliability u
 3. `skill-manager.ts` already uses `validateInstalledSkills()` — no change needed
 
 **Acceptance criteria:**
-- [ ] Malformed `manifest.json` (missing required fields) produces a descriptive error
-- [ ] Malformed `stats.json` returns defaults instead of passing bad data through
+- [x] Malformed `manifest.json` (missing required fields) produces a descriptive error
+- [x] Malformed `stats.json` returns defaults instead of passing bad data through
 
 ---
 
@@ -38,6 +40,8 @@ These are non-crashing bugs and maintainability issues that affect reliability u
 **Problem:** Already fixed — both files now use `extractBalancedJson()` from `src/utils/json-parser.ts` instead of greedy regex. **This task is already complete.**
 
 **Status:** DONE
+
+> **Note:** Task 5.2 was already marked as DONE in the original roadmap.
 
 ---
 
@@ -54,8 +58,8 @@ These are non-crashing bugs and maintainability issues that affect reliability u
 3. Optionally: add recursive directory copying for nested template contexts
 
 **Acceptance criteria:**
-- [ ] Templates with subdirectories in `context/` don't crash on creation
-- [ ] Regular template creation still works
+- [x] Templates with subdirectories in `context/` don't crash on creation
+- [x] Regular template creation still works
 
 ---
 
@@ -70,9 +74,9 @@ These are non-crashing bugs and maintainability issues that affect reliability u
 1. Clamp the value: `const filled = Math.max(0, Math.min(width, Math.round((value / max) * width)));`
 
 **Acceptance criteria:**
-- [ ] `bar(-1, 10, 20)` doesn't crash
-- [ ] `bar(15, 10, 20)` doesn't crash
-- [ ] Normal values still render correctly
+- [x] `bar(-1, 10, 20)` doesn't crash
+- [x] `bar(15, 10, 20)` doesn't crash
+- [x] Normal values still render correctly
 
 ---
 
@@ -87,8 +91,8 @@ These are non-crashing bugs and maintainability issues that affect reliability u
 1. Add `Math.max(0, ...)` floor to both winner and loser ELO calculations
 
 **Acceptance criteria:**
-- [ ] ELO never goes below 0 regardless of input values
-- [ ] Normal ELO calculations still produce correct results
+- [x] ELO never goes below 0 regardless of input values
+- [x] Normal ELO calculations still produce correct results
 
 ---
 
@@ -104,8 +108,8 @@ These are non-crashing bugs and maintainability issues that affect reliability u
 2. Throw descriptive error: `"Report template '${name}.hbs' not found at ${path}. Miyagi may not be installed correctly."`
 
 **Acceptance criteria:**
-- [ ] Missing template file produces a helpful error message
-- [ ] Valid template paths still work normally
+- [x] Missing template file produces a helpful error message
+- [x] Valid template paths still work normally
 
 ---
 
@@ -121,5 +125,5 @@ These are non-crashing bugs and maintainability issues that affect reliability u
 2. Remove inline reimplementation
 
 **Acceptance criteria:**
-- [ ] `miyagi templates list` uses `TemplateLoader.list()`
-- [ ] Output is the same as before
+- [x] `miyagi templates list` uses `TemplateLoader.list()`
+- [x] Output is the same as before
