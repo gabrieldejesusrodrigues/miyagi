@@ -17,10 +17,10 @@
 - [x] Task 8: Commander program setup with all command stubs
 
 ## Phase 4: Agent Impersonation
-- [ ] Task 9: `miyagi use` — impersonate agent with skill symlinks
+- [x] Task 9: `miyagi use` — impersonate agent with skill symlinks
 
 ## Phase 5: Battle System
-- [ ] Task 10: Battle engine core — symmetric battles
+- [x] Task 10: Battle engine core — symmetric battles
 - [ ] Task 11: Battle mediator — asymmetric battles
 - [ ] Task 12: Remaining battle modes
 
@@ -33,7 +33,7 @@
 - [ ] Task 16: Training history manager
 
 ## Phase 8: Import/Export Security
-- [ ] Task 17: Secure archive handling
+- [x] Task 17: Secure archive handling
 
 ## Phase 9: Stats Display
 - [ ] Task 18: Terminal stats rendering
