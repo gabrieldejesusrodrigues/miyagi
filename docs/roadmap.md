@@ -36,7 +36,7 @@
 - [x] Task 17: Secure archive handling
 
 ## Phase 9: Stats Display
-- [ ] Task 18: Terminal stats rendering
+- [x] Task 18: Terminal stats rendering
 
 ## Phase 10: HTML Reports
 - [x] Task 19: Report design system and templates
@@ -48,16 +48,16 @@
 - [ ] Task 21: AI-assisted interactive agent creation
 
 ## Phase 13: Wire Everything Together
-- [ ] Task 22: Wire battle command end-to-end
-- [ ] Task 23: Wire train, export, import, templates, report, sessions commands
-- [ ] Task 23b: Help system with Claude Code flag pass-through
+- [x] Task 22: Wire battle command end-to-end
+- [x] Task 23: Wire train, export, import, templates, report, sessions commands
+- [x] Task 23b: Help system with Claude Code flag pass-through
 
 ## Phase 14: Integration Testing & Polish
 - [ ] Task 24: End-to-end integration tests
 - [ ] Task 25: Package for npm publishing
 
 ## Phase 15: CI/CD & npm Publishing
-- [ ] Task 26: GitHub Actions CI pipeline
+- [x] Task 26: GitHub Actions CI pipeline
 - [ ] Task 27: npm package configuration
 - [ ] Task 28: Release process documentation
 
