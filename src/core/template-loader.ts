@@ -27,12 +27,16 @@ export class TemplateLoader {
       .map(d => {
         const manifestPath = join(this.templatesDir, d.name, 'manifest.json');
         if (!existsSync(manifestPath)) return null;
-        const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as AgentManifest;
-        return {
-          name: manifest.name,
-          description: manifest.description ?? '',
-          domains: manifest.domains ?? [],
-        };
+        try {
+          const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as AgentManifest;
+          return {
+            name: manifest.name,
+            description: manifest.description ?? '',
+            domains: manifest.domains ?? [],
+          };
+        } catch {
+          return null;
+        }
       })
       .filter((t): t is TemplateInfo => t !== null);
   }
@@ -46,7 +50,12 @@ export class TemplateLoader {
 
     if (!existsSync(manifestPath)) return null;
 
-    const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as AgentManifest;
+    let manifest: AgentManifest;
+    try {
+      manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as AgentManifest;
+    } catch {
+      return null;
+    }
     const identityContent = existsSync(identityPath)
       ? readFileSync(identityPath, 'utf-8')
       : '';
