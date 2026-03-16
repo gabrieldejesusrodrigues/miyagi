@@ -65,7 +65,7 @@ export class ClaudeBridge {
       args.push('--model', options.model);
     }
 
-    args.push('--prompt', options.prompt);
+    args.push(options.prompt);
 
     return args;
   }
