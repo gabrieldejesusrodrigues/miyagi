@@ -18,6 +18,7 @@ export function registerBattleCommand(program: Command): void {
     .option('-t, --task <task>', 'Task description (for symmetric modes)')
     .option('--topic <topic>', 'Topic (for debate mode)')
     .option('--rounds <rounds>', 'Max rounds', parseInt)
+    .option('-e, --effort <level>', 'Effort level: low, medium, high, max', 'medium')
     .description('Start a battle between two agents')
     .action(async (agent1, agent2, options) => {
       if (!agent1 || !agent2) {
@@ -62,9 +63,10 @@ export function registerBattleCommand(program: Command): void {
 
         console.log('\nStarting battle...');
 
+        const effort = options.effort as string;
         const result = modeConfig.type === 'symmetric'
-          ? await engine.runSymmetric(battleConfig, agentManager, bridge)
-          : await engine.runAsymmetric(battleConfig, agentManager, bridge);
+          ? await engine.runSymmetric(battleConfig, agentManager, bridge, effort)
+          : await engine.runAsymmetric(battleConfig, agentManager, bridge, effort);
 
         // Print round summaries
         console.log(`\n--- Battle Complete (${result.terminationReason}) ---`);
@@ -86,7 +88,7 @@ export function registerBattleCommand(program: Command): void {
           systemPrompt: judge.getIdentity(),
           prompt: evalPrompt,
           model: 'opus',
-          effort: 'medium',
+          effort: 'medium', // Judge always uses medium for reliable JSON output
         };
         const verdictRaw = await bridge.runAndCapture(
           bridge.buildBattleArgs(judgeOpts), 600_000, bridge.buildBattleStdin(judgeOpts),

@@ -47,7 +47,7 @@ export function formatTerminalHelp(): string {
   lines.push('    clone <type> <source> <target>    Clone an agent');
   lines.push('    list <type> [options]             List agents or skills');
   lines.push('    use <agent> [options]             Start a Claude Code session as an agent');
-  lines.push('    battle [agent1] [agent2]          Start a battle between two agents');
+  lines.push('    battle [agent1] [agent2] [options] Start a battle between two agents');
   lines.push('    train <agent> [options]           Train an agent with Mr. Miyagi coaching');
   lines.push('    stats <agent> [options]           Show agent stats, ELO, and skill radar');
   lines.push('    export <agent> [options]          Export an agent package');

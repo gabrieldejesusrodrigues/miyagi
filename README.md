@@ -101,6 +101,7 @@ When you `use` an agent, Miyagi injects the agent's identity, context files, and
 |:--------|:------------|
 | `miyagi battle <a> <b>` | Battle two agents (defaults to `same-task` mode) |
 | `miyagi battle <a> <b> --mode debate --topic "tabs vs spaces"` | Battle with a specific mode and topic |
+| `miyagi battle <a> <b> --effort low` | Battle with a specific effort level (low, medium, high, max) |
 | `miyagi battle <a> <b> --background` | Run battle in background |
 
 ### Training & Stats
@@ -167,6 +168,7 @@ Each agent takes a different role, creating dynamic interactions.
 miyagi battle agent-a agent-b --mode code-challenge --task "implement a LRU cache"
 miyagi battle agent-a agent-b --mode debate --topic "monoliths vs microservices"
 miyagi battle agent-a agent-b --mode negotiation --topic "SaaS contract renewal"
+miyagi battle agent-a agent-b --mode sales-roleplay --effort low
 ```
 
 <br />

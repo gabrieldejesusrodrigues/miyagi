@@ -116,6 +116,32 @@ describe('ClaudeBridge', () => {
       const args = bridge.buildBattleArgs({ systemPrompt: 'sys', prompt: 'user' });
       expect(args).not.toContain('--model');
     });
+
+    it('should add effort flag when provided', () => {
+      const bridge = new ClaudeBridge('echo');
+      const args = bridge.buildBattleArgs({
+        systemPrompt: 'sys',
+        prompt: 'user',
+        effort: 'low',
+      });
+      expect(args).toContain('--effort');
+      expect(args).toContain('low');
+    });
+
+    it('should not add effort flag when omitted', () => {
+      const bridge = new ClaudeBridge('echo');
+      const args = bridge.buildBattleArgs({ systemPrompt: 'sys', prompt: 'user' });
+      expect(args).not.toContain('--effort');
+    });
+
+    it('should accept all valid effort values', () => {
+      const bridge = new ClaudeBridge('echo');
+      for (const effort of ['low', 'medium', 'high', 'max']) {
+        const args = bridge.buildBattleArgs({ systemPrompt: 'sys', prompt: 'user', effort });
+        expect(args).toContain('--effort');
+        expect(args).toContain(effort);
+      }
+    });
   });
 
   describe('runAndCapture', () => {

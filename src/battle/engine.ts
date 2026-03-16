@@ -77,6 +77,7 @@ export class BattleEngine {
     config: BattleConfig,
     agentManager: AgentManager,
     bridge: ClaudeBridge,
+    effort?: string,
   ): Promise<BattleResult> {
     const agentA = await agentManager.get(config.agentA);
     const agentB = await agentManager.get(config.agentB);
@@ -101,8 +102,8 @@ export class BattleEngine {
           `Continue and improve on the above.`;
       }
 
-      const optsA = { systemPrompt: identityA, prompt: taskPrompt };
-      const optsB = { systemPrompt: identityB, prompt: taskPrompt };
+      const optsA = { systemPrompt: identityA, prompt: taskPrompt, effort };
+      const optsB = { systemPrompt: identityB, prompt: taskPrompt, effort };
 
       const [agentAResponse, agentBResponse] = await Promise.all([
         bridge.runAndCapture(bridge.buildBattleArgs(optsA), undefined, bridge.buildBattleStdin(optsA)),
@@ -119,6 +120,7 @@ export class BattleEngine {
     config: BattleConfig,
     agentManager: AgentManager,
     bridge: ClaudeBridge,
+    effort?: string,
   ): Promise<BattleResult> {
     const agentA = await agentManager.get(config.agentA);
     const agentB = await agentManager.get(config.agentB);
@@ -138,7 +140,7 @@ export class BattleEngine {
 
     for (let round = 1; round <= config.maxRounds; round++) {
       const turnPromptA = mediator.buildTurnPrompt(rolePrompts.agentA, history, round, config.maxRounds);
-      const optsA = { systemPrompt: identityA, prompt: turnPromptA };
+      const optsA = { systemPrompt: identityA, prompt: turnPromptA, effort };
       const responseA = await bridge.runAndCapture(
         bridge.buildBattleArgs(optsA), undefined, bridge.buildBattleStdin(optsA),
       );
@@ -151,7 +153,7 @@ export class BattleEngine {
       }
 
       const turnPromptB = mediator.buildTurnPrompt(rolePrompts.agentB, history, round, config.maxRounds);
-      const asymOptsB = { systemPrompt: identityB, prompt: turnPromptB };
+      const asymOptsB = { systemPrompt: identityB, prompt: turnPromptB, effort };
       const responseB = await bridge.runAndCapture(
         bridge.buildBattleArgs(asymOptsB), undefined, bridge.buildBattleStdin(asymOptsB),
       );
