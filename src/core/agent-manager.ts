@@ -22,7 +22,14 @@ export class AgentManager {
     this.projectDir = projectDir;
   }
 
+  private validateAgentName(name: string): void {
+    if (!name || !/^[a-zA-Z0-9_-]+$/.test(name)) {
+      throw new Error(`Invalid agent name "${name}". Names can only contain letters, numbers, hyphens, and underscores.`);
+    }
+  }
+
   async create(name: string, options: CreateOptions): Promise<Agent> {
+    this.validateAgentName(name);
     const agentDir = join(this.config.agentsDir, name);
 
     if (existsSync(agentDir)) {
@@ -115,6 +122,7 @@ export class AgentManager {
   }
 
   async delete(name: string): Promise<void> {
+    this.validateAgentName(name);
     const agentDir = join(this.config.agentsDir, name);
     if (!existsSync(agentDir)) {
       throw new Error(`Agent "${name}" not found`);
@@ -123,6 +131,8 @@ export class AgentManager {
   }
 
   async clone(sourceName: string, targetName: string): Promise<Agent> {
+    this.validateAgentName(sourceName);
+    this.validateAgentName(targetName);
     const source = await this.get(sourceName);
     if (!source) {
       throw new Error(`Agent "${sourceName}" not found`);
