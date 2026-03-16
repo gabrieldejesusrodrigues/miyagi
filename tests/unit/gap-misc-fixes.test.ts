@@ -22,13 +22,14 @@ describe('importAgent zip detection (GAP-7)', () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('throws clear error for .zip files instead of opaque tar error', async () => {
+  it('attempts zip extraction (zip support now implemented)', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'miyagi-test-'));
     const zipPath = join(tempDir, 'agent.zip');
     writeFileSync(zipPath, 'fake zip content');
 
-    await expect(importAgent(zipPath, join(tempDir, 'output')))
-      .rejects.toThrow('Zip import is not yet supported');
+    // A corrupt/fake zip now throws an ADM-ZIP parse error rather than the
+    // old "not yet supported" placeholder. Any rejection is acceptable.
+    await expect(importAgent(zipPath, join(tempDir, 'output'))).rejects.toThrow();
   });
 });
 

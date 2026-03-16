@@ -3,6 +3,7 @@ import { join, basename } from 'path';
 import * as tar from 'tar';
 import { ReadEntry } from 'tar';
 import archiver from 'archiver';
+import AdmZip from 'adm-zip';
 import { validateArchiveEntry } from '../cli/middleware/security.js';
 
 export async function exportAgent(agentDir: string, outputPath: string, format: 'tar.gz' | 'zip' = 'tar.gz'): Promise<void> {
@@ -30,9 +31,29 @@ export async function importAgent(sourcePath: string, targetDir: string): Promis
   }
 
   if (sourcePath.endsWith('.zip')) {
-    throw new Error(
-      'Zip import is not yet supported. Please export using tar.gz format (the default).'
-    );
+    const zip = new AdmZip(sourcePath);
+    const entries = zip.getEntries();
+    for (const entry of entries) {
+      if (entry.isDirectory) continue;
+      const entryPath = entry.entryName;
+      const result = validateArchiveEntry(entryPath, {
+        isSymlink: false,
+        size: entry.header.size,
+      });
+      if (!result.valid) {
+        console.warn(`Skipping unsafe entry: ${entryPath} — ${result.errors?.join(', ')}`);
+        continue;
+      }
+      if (result.warning) {
+        console.warn(result.warning);
+      }
+      zip.extractEntryTo(entry, targetDir, true, true);
+    }
+    return;
+  }
+
+  if (!sourcePath.endsWith('.tar.gz') && !sourcePath.endsWith('.tgz')) {
+    throw new Error('Unsupported archive format. Supported: .tar.gz, .zip');
   }
 
   await tar.extract({
