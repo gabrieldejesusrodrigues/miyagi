@@ -1,3 +1,4 @@
+import { spawn } from 'child_process';
 import type { Command } from 'commander';
 import { ConfigManager } from '../../core/config.js';
 import { AgentManager } from '../../core/agent-manager.js';
@@ -35,7 +36,20 @@ export function registerAgentCommands(program: Command): void {
     .description('Edit an agent interactively')
     .action(async (type, name) => {
       if (type === 'agent') {
-        console.log(`Editing ${type}: ${name}`);
+        const config = new ConfigManager();
+        const agentManager = new AgentManager(config, process.cwd());
+        const agent = await agentManager.get(name);
+        if (!agent) {
+          console.error(`Agent "${name}" not found`);
+          process.exit(1);
+        }
+        const editor = process.env.EDITOR || process.env.VISUAL || 'vi';
+        const child = spawn(editor, [agent.identityPath], { stdio: 'inherit' });
+        child.on('close', (code) => {
+          if (code === 0) console.log(`Agent "${name}" identity updated.`);
+          else console.error(`Editor exited with code ${code}`);
+          process.exit(code ?? 0);
+        });
       } else {
         console.error(`Unknown type "${type}". Supported types: agent`);
         process.exit(1);
