@@ -27,15 +27,16 @@ jobs:
       - name: Audit dependencies
         run: pnpm audit --audit-level=high
 
-  codeql:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
-        with:
-          languages: typescript
-      - uses: github/codeql-action/autobuild@v3
-      - uses: github/codeql-action/analyze@v3
+  # TODO: uncomment when repo is public (CodeQL requires GitHub Advanced Security for private repos)
+  # codeql:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: github/codeql-action/init@v3
+  #       with:
+  #         languages: typescript
+  #     - uses: github/codeql-action/autobuild@v3
+  #     - uses: github/codeql-action/analyze@v3
 
   secrets-scan:
     runs-on: ubuntu-latest
