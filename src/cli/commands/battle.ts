@@ -88,7 +88,7 @@ export function registerBattleCommand(program: Command): void {
           systemPrompt: judge.getIdentity(),
           prompt: evalPrompt,
           model: 'opus',
-          effort: 'medium', // Judge always uses medium for reliable JSON output
+          effort: ['high', 'max'].includes(effort) ? effort : 'medium',
         };
         const verdictRaw = await bridge.runAndCapture(
           bridge.buildBattleArgs(judgeOpts), 600_000, bridge.buildBattleStdin(judgeOpts),
