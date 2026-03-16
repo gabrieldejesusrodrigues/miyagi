@@ -1,4 +1,7 @@
 import type { Command } from 'commander';
+import { ConfigManager } from '../../core/config.js';
+import { AgentManager } from '../../core/agent-manager.js';
+import { SkillManager } from '../../core/skill-manager.js';
 
 export function registerAgentCommands(program: Command): void {
   program
@@ -9,7 +12,19 @@ export function registerAgentCommands(program: Command): void {
     .option('-a, --agent <agent>', 'Target agent (for skills)')
     .description('Create a new agent or skill')
     .action(async (type, name, options) => {
-      console.log(`Creating ${type}: ${name}`);
+      const config = new ConfigManager();
+      config.ensureDirectories();
+      const agentManager = new AgentManager(config, process.cwd());
+
+      if (type === 'agent') {
+        await agentManager.create(name, {
+          author: process.env.USER ?? 'unknown',
+          templateOrigin: options.template,
+        });
+        console.log(`Agent "${name}" created successfully.`);
+      } else {
+        console.log(`Creating ${type}: ${name}`);
+      }
     });
 
   program
@@ -27,7 +42,13 @@ export function registerAgentCommands(program: Command): void {
     .argument('<name>', 'Name of the agent')
     .description('Delete an agent')
     .action(async (type, name) => {
-      console.log(`Deleting ${type}: ${name}`);
+      const config = new ConfigManager();
+      const agentManager = new AgentManager(config, process.cwd());
+
+      if (type === 'agent') {
+        await agentManager.delete(name);
+        console.log(`Agent "${name}" deleted.`);
+      }
     });
 
   program
@@ -37,7 +58,13 @@ export function registerAgentCommands(program: Command): void {
     .argument('<target>', 'Target agent name')
     .description('Clone an agent')
     .action(async (type, source, target) => {
-      console.log(`Cloning ${type}: ${source} -> ${target}`);
+      const config = new ConfigManager();
+      const agentManager = new AgentManager(config, process.cwd());
+
+      if (type === 'agent') {
+        await agentManager.clone(source, target);
+        console.log(`Agent "${source}" cloned to "${target}".`);
+      }
     });
 
   program
@@ -46,6 +73,30 @@ export function registerAgentCommands(program: Command): void {
     .option('-a, --agent <agent>', 'Target agent (for skills)')
     .description('List agents or skills')
     .action(async (type, options) => {
-      console.log(`Listing ${type}`);
+      const config = new ConfigManager();
+      const agentManager = new AgentManager(config, process.cwd());
+
+      if (type === 'agents') {
+        const agents = await agentManager.list();
+        if (agents.length === 0) {
+          console.log('No agents found.');
+          return;
+        }
+        console.log('Agents:');
+        for (const agent of agents) {
+          console.log(`  ${agent.name.padEnd(20)} [${agent.scope}] ${agent.manifest.description ?? ''}`);
+        }
+      } else if (type === 'skills' && options.agent) {
+        const skillManager = new SkillManager(agentManager);
+        const skills = await skillManager.list(options.agent);
+        if (skills.length === 0) {
+          console.log(`No skills found for "${options.agent}".`);
+          return;
+        }
+        console.log(`Skills for ${options.agent}:`);
+        for (const skill of skills) {
+          console.log(`  ${skill.name.padEnd(20)} [${skill.type}] ${skill.metadata.description}`);
+        }
+      }
     });
 }
