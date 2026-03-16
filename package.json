@@ -50,6 +50,10 @@
     "url": "https://github.com/gabrieldejesusrodrigues/miyagi/issues"
   },
   "homepage": "https://github.com/gabrieldejesusrodrigues/miyagi#readme",
+  "publishConfig": {
+    "provenance": true,
+    "access": "public"
+  },
   "engines": {
     "node": ">=18"
   },
