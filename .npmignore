@@ -1,0 +1,21 @@
+# Source & dev files
+src/
+tests/
+tsconfig.json
+tsup.config.ts
+vitest.config.ts
+.github/
+.gitignore
+.eslintrc*
+.prettierrc*
+coverage/
+*.tgz
+docs/
+.omc/
+
+# Keep these (override .gitignore)
+!dist/
+!src/builtin-agents/
+!src/templates/
+!src/reports/templates/
+!src/reports/assets/

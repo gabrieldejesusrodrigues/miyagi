@@ -1,25 +1,67 @@
 {
   "name": "miyagi",
   "version": "0.1.0",
-  "description": "Agent & Skill Trainer for Claude Code",
+  "description": "Agent & Skill Trainer for Claude Code — create, battle, and coach AI agents",
   "type": "module",
   "bin": {
     "miyagi": "./dist/bin/miyagi.js"
   },
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "files": [
+    "dist/",
+    "src/builtin-agents/",
+    "src/templates/",
+    "src/reports/templates/",
+    "src/reports/assets/",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit"
+    "test:coverage": "vitest run --coverage",
+    "test:security": "vitest run --grep 'security|traversal|symlink|sanitiz'",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "pnpm build",
+    "release:patch": "npm version patch && git push --follow-tags",
+    "release:minor": "npm version minor && git push --follow-tags",
+    "release:major": "npm version major && git push --follow-tags"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "cli",
+    "claude",
+    "claude-code",
+    "ai-agent",
+    "agent-training",
+    "skills",
+    "miyagi",
+    "llm"
+  ],
+  "author": "Gabriel de Jesus Rodrigues",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gabrieldejesusrodrigues/miyagi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gabrieldejesusrodrigues/miyagi/issues"
+  },
+  "homepage": "https://github.com/gabrieldejesusrodrigues/miyagi#readme",
   "engines": {
     "node": ">=18"
   },
   "packageManager": "pnpm@10.32.1",
+  "peerDependencies": {
+    "@anthropic-ai/claude-code": ">=2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/claude-code": {
+      "optional": true
+    }
+  },
   "dependencies": {
     "archiver": "^7.0.1",
     "chalk": "^5.6.2",
