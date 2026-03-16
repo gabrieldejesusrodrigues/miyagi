@@ -11,15 +11,20 @@ export function registerSkillCommands(program: Command): void {
     .argument('<agent>', 'Target agent')
     .description('Install a skill into an agent')
     .action(async (type, source, agent) => {
-      if (type === 'skill') {
-        const config = new ConfigManager();
-        config.ensureDirectories();
-        const agentManager = new AgentManager(config, process.cwd());
-        const skillManager = new SkillManager(agentManager);
-        await skillManager.install(source, agent);
-        console.log(`Skill "${source}" installed into agent "${agent}".`);
-      } else {
-        console.error(`Unknown type "${type}". Supported types: skill`);
+      try {
+        if (type === 'skill') {
+          const config = new ConfigManager();
+          config.ensureDirectories();
+          const agentManager = new AgentManager(config, process.cwd());
+          const skillManager = new SkillManager(agentManager);
+          await skillManager.install(source, agent);
+          console.log(`Skill "${source}" installed into agent "${agent}".`);
+        } else {
+          console.error(`Unknown type "${type}". Supported types: skill`);
+          process.exit(1);
+        }
+      } catch (err) {
+        console.error(err instanceof Error ? err.message : String(err));
         process.exit(1);
       }
     });
@@ -30,15 +35,20 @@ export function registerSkillCommands(program: Command): void {
     .argument('<agent>', 'Target agent')
     .description('Update skills for an agent')
     .action(async (type, agent) => {
-      if (type === 'skills') {
-        const config = new ConfigManager();
-        config.ensureDirectories();
-        const agentManager = new AgentManager(config, process.cwd());
-        const skillManager = new SkillManager(agentManager);
-        await skillManager.updateAll(agent);
-        console.log(`Skills for agent "${agent}" updated successfully.`);
-      } else {
-        console.error(`Unknown type "${type}". Supported types: skills`);
+      try {
+        if (type === 'skills') {
+          const config = new ConfigManager();
+          config.ensureDirectories();
+          const agentManager = new AgentManager(config, process.cwd());
+          const skillManager = new SkillManager(agentManager);
+          await skillManager.updateAll(agent);
+          console.log(`Skills for agent "${agent}" updated successfully.`);
+        } else {
+          console.error(`Unknown type "${type}". Supported types: skills`);
+          process.exit(1);
+        }
+      } catch (err) {
+        console.error(err instanceof Error ? err.message : String(err));
         process.exit(1);
       }
     });

@@ -46,10 +46,14 @@ export class SkillManager {
     const agent = await this.agentManager.get(agentName);
     if (!agent) throw new Error(`Agent "${agentName}" not found`);
 
-    execSync(`npx skills add ${source} --copy`, {
-      cwd: agent.skillsDir,
-      stdio: 'inherit',
-    });
+    try {
+      execSync(`npx skills add ${source} --copy`, {
+        cwd: agent.skillsDir,
+        stdio: 'inherit',
+      });
+    } catch {
+      throw new Error(`Failed to install skill "${source}". Verify the skill source is valid.`);
+    }
   }
 
   async remove(skillName: string, agentName: string): Promise<void> {
@@ -74,10 +78,14 @@ export class SkillManager {
 
     const installed = this.readInstalledSkills(agent.rootDir);
     for (const skill of installed) {
-      execSync(`npx skills add ${skill.source} --copy --yes`, {
-        cwd: agent.skillsDir,
-        stdio: 'inherit',
-      });
+      try {
+        execSync(`npx skills add ${skill.source} --copy --yes`, {
+          cwd: agent.skillsDir,
+          stdio: 'inherit',
+        });
+      } catch {
+        console.error(`Failed to update skill "${skill.name}" from "${skill.source}".`);
+      }
     }
   }
 

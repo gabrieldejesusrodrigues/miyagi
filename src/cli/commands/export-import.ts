@@ -33,11 +33,16 @@ export function registerExportImportCommands(program: Command): void {
     .argument('<source>', 'File or directory to import')
     .description('Import an agent package')
     .action(async (source) => {
-      const config = new ConfigManager();
-      config.ensureDirectories();
+      try {
+        const config = new ConfigManager();
+        config.ensureDirectories();
 
-      console.log(`Importing from ${source}...`);
-      await importAgent(source, config.agentsDir);
-      console.log(`Imported successfully.`);
+        console.log(`Importing from ${source}...`);
+        await importAgent(source, config.agentsDir);
+        console.log(`Imported successfully.`);
+      } catch (err) {
+        console.error(err instanceof Error ? err.message : String(err));
+        process.exit(1);
+      }
     });
 }

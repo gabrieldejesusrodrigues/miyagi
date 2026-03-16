@@ -36,28 +36,27 @@ export function registerBattleCommand(program: Command): void {
       if (!agentA) { console.error(`Agent "${agent1}" not found`); process.exit(1); }
       if (!agentB) { console.error(`Agent "${agent2}" not found`); process.exit(1); }
 
-      // Validate mode
-      const mode = options.mode as BattleMode;
-      engine.validateMode(mode);
-      const modeConfig = getModeConfig(mode);
-
-      // Create battle config
-      const battleConfig = engine.createConfig({
-        agentA: agent1,
-        agentB: agent2,
-        mode,
-        task: options.task,
-        topic: options.topic,
-        maxRounds: options.rounds ?? modeConfig.defaultRounds,
-        background: options.background,
-      });
-
-      console.log(`Battle: ${agent1} vs ${agent2}`);
-      console.log(`Mode: ${mode} (${modeConfig.type})`);
-      console.log(`Rounds: ${battleConfig.maxRounds}`);
-      console.log(`Battle ID: ${battleConfig.id}`);
-
       try {
+        // Validate mode
+        const mode = options.mode as BattleMode;
+        engine.validateMode(mode);
+        const modeConfig = getModeConfig(mode);
+
+        // Create battle config
+        const battleConfig = engine.createConfig({
+          agentA: agent1,
+          agentB: agent2,
+          mode,
+          task: options.task,
+          topic: options.topic,
+          maxRounds: options.rounds ?? modeConfig.defaultRounds,
+          background: options.background,
+        });
+
+        console.log(`Battle: ${agent1} vs ${agent2}`);
+        console.log(`Mode: ${mode} (${modeConfig.type})`);
+        console.log(`Rounds: ${battleConfig.maxRounds}`);
+        console.log(`Battle ID: ${battleConfig.id}`);
         const bridge = new ClaudeBridge();
         const history = new HistoryManager(agentManager);
 
