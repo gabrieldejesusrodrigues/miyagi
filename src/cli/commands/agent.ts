@@ -3,6 +3,7 @@ import type { Command } from 'commander';
 import { ConfigManager } from '../../core/config.js';
 import { AgentManager } from '../../core/agent-manager.js';
 import { SkillManager } from '../../core/skill-manager.js';
+import { TemplateLoader } from '../../core/template-loader.js';
 
 export function registerAgentCommands(program: Command): void {
   program
@@ -13,18 +14,27 @@ export function registerAgentCommands(program: Command): void {
     .option('-a, --agent <agent>', 'Target agent (for skills)')
     .description('Create a new agent or skill')
     .action(async (type, name, options) => {
-      const config = new ConfigManager();
-      config.ensureDirectories();
-      const agentManager = new AgentManager(config, process.cwd());
+      try {
+        const config = new ConfigManager();
+        config.ensureDirectories();
+        const agentManager = new AgentManager(config, process.cwd());
 
-      if (type === 'agent') {
-        await agentManager.create(name, {
-          author: process.env.USER ?? 'unknown',
-          templateOrigin: options.template,
-        });
-        console.log(`Agent "${name}" created successfully.`);
-      } else {
-        console.error(`Unknown type "${type}". Supported types: agent`);
+        if (type === 'agent') {
+          const agent = await agentManager.create(name, {
+            author: process.env.USER ?? 'unknown',
+            templateOrigin: options.template,
+          });
+          if (options.template) {
+            const templateLoader = new TemplateLoader();
+            templateLoader.applyTemplate(options.template, agent.rootDir);
+          }
+          console.log(`Agent "${name}" created successfully.`);
+        } else {
+          console.error(`Unknown type "${type}". Supported types: agent`);
+          process.exit(1);
+        }
+      } catch (err) {
+        console.error(err instanceof Error ? err.message : String(err));
         process.exit(1);
       }
     });
@@ -62,14 +72,19 @@ export function registerAgentCommands(program: Command): void {
     .argument('<name>', 'Name of the agent')
     .description('Delete an agent')
     .action(async (type, name) => {
-      const config = new ConfigManager();
-      const agentManager = new AgentManager(config, process.cwd());
+      try {
+        const config = new ConfigManager();
+        const agentManager = new AgentManager(config, process.cwd());
 
-      if (type === 'agent') {
-        await agentManager.delete(name);
-        console.log(`Agent "${name}" deleted.`);
-      } else {
-        console.error(`Unknown type "${type}". Supported types: agent`);
+        if (type === 'agent') {
+          await agentManager.delete(name);
+          console.log(`Agent "${name}" deleted.`);
+        } else {
+          console.error(`Unknown type "${type}". Supported types: agent`);
+          process.exit(1);
+        }
+      } catch (err) {
+        console.error(err instanceof Error ? err.message : String(err));
         process.exit(1);
       }
     });
@@ -81,14 +96,19 @@ export function registerAgentCommands(program: Command): void {
     .argument('<target>', 'Target agent name')
     .description('Clone an agent')
     .action(async (type, source, target) => {
-      const config = new ConfigManager();
-      const agentManager = new AgentManager(config, process.cwd());
+      try {
+        const config = new ConfigManager();
+        const agentManager = new AgentManager(config, process.cwd());
 
-      if (type === 'agent') {
-        await agentManager.clone(source, target);
-        console.log(`Agent "${source}" cloned to "${target}".`);
-      } else {
-        console.error(`Unknown type "${type}". Supported types: agent`);
+        if (type === 'agent') {
+          await agentManager.clone(source, target);
+          console.log(`Agent "${source}" cloned to "${target}".`);
+        } else {
+          console.error(`Unknown type "${type}". Supported types: agent`);
+          process.exit(1);
+        }
+      } catch (err) {
+        console.error(err instanceof Error ? err.message : String(err));
         process.exit(1);
       }
     });

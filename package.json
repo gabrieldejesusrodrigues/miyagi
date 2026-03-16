@@ -18,7 +18,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && node scripts/copy-assets.cjs",
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
