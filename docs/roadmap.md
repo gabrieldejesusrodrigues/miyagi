@@ -7,11 +7,11 @@
 - [x] Task 2: Define core types and interfaces
 
 ## Phase 2: Core Infrastructure
-- [ ] Task 3: Config manager
-- [ ] Task 4: Agent manager — CRUD operations
-- [ ] Task 5: Skill manager — skills.sh integration
-- [ ] Task 6: Claude bridge — spawning and managing claude processes
-- [ ] Task 7: Session manager
+- [x] Task 3: Config manager
+- [x] Task 4: Agent manager — CRUD operations
+- [x] Task 5: Skill manager — skills.sh integration
+- [x] Task 6: Claude bridge — spawning and managing claude processes
+- [x] Task 7: Session manager
 
 ## Phase 3: CLI Command Routing
 - [ ] Task 8: Commander program setup with all command stubs
