@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import type { BattleResult, JudgeVerdict } from '../types/index.js';
+import { extractBalancedJson } from '../utils/json-parser.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -45,13 +46,12 @@ export class Judge {
   }
 
   parseVerdict(raw: string): JudgeVerdict {
-    // Try to extract JSON from the response (may have surrounding text)
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    const jsonStr = extractBalancedJson(raw);
+    if (!jsonStr) {
       throw new Error('Failed to parse judge verdict: no JSON found in response');
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(jsonStr);
 
     // Validate required fields
     if (!parsed.winner || !parsed.reason || !parsed.agentAAnalysis || !parsed.agentBAnalysis) {

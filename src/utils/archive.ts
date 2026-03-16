@@ -1,5 +1,5 @@
 import { createWriteStream, existsSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { join, basename } from 'path';
 import * as tar from 'tar';
 import { ReadEntry } from 'tar';
 import archiver from 'archiver';
@@ -13,13 +13,13 @@ export async function exportAgent(agentDir: string, outputPath: string, format: 
         file: outputPath,
         cwd: join(agentDir, '..'),
       },
-      [agentDir.split('/').pop()!],
+      [basename(agentDir)],
     );
   } else {
     const output = createWriteStream(outputPath);
     const archive = archiver('zip', { zlib: { level: 9 } });
     archive.pipe(output);
-    archive.directory(agentDir, agentDir.split('/').pop()!);
+    archive.directory(agentDir, basename(agentDir));
     await archive.finalize();
   }
 }
@@ -27,6 +27,12 @@ export async function exportAgent(agentDir: string, outputPath: string, format: 
 export async function importAgent(sourcePath: string, targetDir: string): Promise<void> {
   if (!existsSync(targetDir)) {
     mkdirSync(targetDir, { recursive: true });
+  }
+
+  if (sourcePath.endsWith('.zip')) {
+    throw new Error(
+      'Zip import is not yet supported. Please export using tar.gz format (the default).'
+    );
   }
 
   await tar.extract({

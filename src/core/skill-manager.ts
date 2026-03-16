@@ -4,6 +4,7 @@ import {
 import { join } from 'path';
 import { execSync } from 'child_process';
 import type { AgentSkill, InstalledSkillEntry } from '../types/index.js';
+import { validateInstalledSkills } from '../utils/validators.js';
 import type { AgentManager } from './agent-manager.js';
 
 export class SkillManager {
@@ -99,9 +100,21 @@ export class SkillManager {
   }
 
   private readInstalledSkills(agentRootDir: string): InstalledSkillEntry[] {
-    const path = join(agentRootDir, '.installed-skills.json');
-    if (!existsSync(path)) return [];
-    return JSON.parse(readFileSync(path, 'utf-8'));
+    const filePath = join(agentRootDir, '.installed-skills.json');
+    if (!existsSync(filePath)) return [];
+    try {
+      const data = JSON.parse(readFileSync(filePath, 'utf-8'));
+      const validation = validateInstalledSkills(data);
+      if (!validation.valid) {
+        throw new Error(`Invalid .installed-skills.json in ${agentRootDir}: ${validation.errors.join(', ')}`);
+      }
+      return data as InstalledSkillEntry[];
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(`Failed to parse .installed-skills.json in ${agentRootDir}: ${error.message}`);
+      }
+      throw error;
+    }
   }
 
   private writeInstalledSkills(agentRootDir: string, entries: InstalledSkillEntry[]): void {

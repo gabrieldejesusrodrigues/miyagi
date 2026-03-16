@@ -48,10 +48,13 @@ export function registerUseCommand(program: Command): void {
 
       console.log(`Starting session as ${agentName}...`);
 
+      const sessionEntry = sessionManager.record(agentName, options.resume && typeof options.resume === 'string' ? options.resume : agentName + '-' + Date.now());
+
       // Spawn interactive claude
       const child = bridge.spawnInteractive(sessionArgs);
 
       child.on('close', async (code) => {
+        sessionManager.endSession(sessionEntry.id);
         await impersonation.deactivate();
         process.exit(code ?? 0);
       });

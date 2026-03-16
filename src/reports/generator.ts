@@ -34,6 +34,9 @@ export class ReportGenerator {
     outputPath: string,
   ): void {
     const templatePath = join(this.templatesDir, 'battle.hbs');
+    if (!existsSync(templatePath)) {
+      throw new Error(`Battle report template not found at ${templatePath}. Ensure the package is installed correctly.`);
+    }
     const template = Handlebars.compile(readFileSync(templatePath, 'utf-8'));
 
     const html = template({
@@ -63,6 +66,9 @@ export class ReportGenerator {
     description?: string,
   ): void {
     const templatePath = join(this.templatesDir, 'profile.hbs');
+    if (!existsSync(templatePath)) {
+      throw new Error(`Profile report template not found at ${templatePath}. Ensure the package is installed correctly.`);
+    }
     const template = Handlebars.compile(readFileSync(templatePath, 'utf-8'));
 
     const html = template({

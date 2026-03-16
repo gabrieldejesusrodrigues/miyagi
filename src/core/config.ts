@@ -47,7 +47,14 @@ export class ConfigManager {
       return {};
     }
     const raw = readFileSync(this.configPath, 'utf-8');
-    return JSON.parse(raw) as MiyagiConfig;
+    try {
+      return JSON.parse(raw) as MiyagiConfig;
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(`Failed to parse config.json at ${this.configPath}: ${error.message}`);
+      }
+      throw error;
+    }
   }
 
   save(config: MiyagiConfig): void {

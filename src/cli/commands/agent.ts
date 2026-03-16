@@ -23,7 +23,8 @@ export function registerAgentCommands(program: Command): void {
         });
         console.log(`Agent "${name}" created successfully.`);
       } else {
-        console.log(`Creating ${type}: ${name}`);
+        console.error(`Unknown type "${type}". Supported types: agent`);
+        process.exit(1);
       }
     });
 
@@ -33,7 +34,12 @@ export function registerAgentCommands(program: Command): void {
     .argument('<name>', 'Name of the agent')
     .description('Edit an agent interactively')
     .action(async (type, name) => {
-      console.log(`Editing ${type}: ${name}`);
+      if (type === 'agent') {
+        console.log(`Editing ${type}: ${name}`);
+      } else {
+        console.error(`Unknown type "${type}". Supported types: agent`);
+        process.exit(1);
+      }
     });
 
   program
@@ -48,6 +54,9 @@ export function registerAgentCommands(program: Command): void {
       if (type === 'agent') {
         await agentManager.delete(name);
         console.log(`Agent "${name}" deleted.`);
+      } else {
+        console.error(`Unknown type "${type}". Supported types: agent`);
+        process.exit(1);
       }
     });
 
@@ -64,6 +73,9 @@ export function registerAgentCommands(program: Command): void {
       if (type === 'agent') {
         await agentManager.clone(source, target);
         console.log(`Agent "${source}" cloned to "${target}".`);
+      } else {
+        console.error(`Unknown type "${type}". Supported types: agent`);
+        process.exit(1);
       }
     });
 
@@ -97,6 +109,9 @@ export function registerAgentCommands(program: Command): void {
         for (const skill of skills) {
           console.log(`  ${skill.name.padEnd(20)} [${skill.type}] ${skill.metadata.description}`);
         }
+      } else {
+        console.error(`Unknown type "${type}". Supported types: agents, skills`);
+        process.exit(1);
       }
     });
 }

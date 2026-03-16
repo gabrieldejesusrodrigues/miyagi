@@ -71,10 +71,11 @@ export class TemplateLoader {
       const agentContextDir = join(agentDir, 'context');
       if (!existsSync(agentContextDir)) mkdirSync(agentContextDir, { recursive: true });
 
-      for (const file of readdirSync(templateContextDir)) {
+      for (const entry of readdirSync(templateContextDir, { withFileTypes: true })) {
+        if (!entry.isFile()) continue;
         copyFileSync(
-          join(templateContextDir, file),
-          join(agentContextDir, file),
+          join(templateContextDir, entry.name),
+          join(agentContextDir, entry.name),
         );
       }
     }

@@ -5,6 +5,7 @@ import {
 import { join } from 'path';
 import type { Agent, AgentManifest, AgentStats } from '../types/index.js';
 import type { ConfigManager } from './config.js';
+import { validateManifest } from '../utils/validators.js';
 
 interface CreateOptions {
   author: string;
@@ -86,8 +87,11 @@ export class AgentManager {
     if (this.projectDir) {
       const projectAgentsDir = join(this.projectDir, '.miyagi', 'agents');
       if (existsSync(projectAgentsDir)) {
-        for (const name of readdirSync(projectAgentsDir)) {
+        for (const entry of readdirSync(projectAgentsDir, { withFileTypes: true })) {
+          if (!entry.isDirectory()) continue;
+          const name = entry.name;
           const agentDir = join(projectAgentsDir, name);
+          if (!existsSync(join(agentDir, 'manifest.json'))) continue;
           const manifest = this.readManifest(agentDir);
           agents.push(this.buildAgent(name, agentDir, manifest, 'project'));
           seen.add(name);
@@ -96,9 +100,12 @@ export class AgentManager {
     }
 
     if (existsSync(this.config.agentsDir)) {
-      for (const name of readdirSync(this.config.agentsDir)) {
+      for (const entry of readdirSync(this.config.agentsDir, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const name = entry.name;
         if (seen.has(name)) continue;
         const agentDir = join(this.config.agentsDir, name);
+        if (!existsSync(join(agentDir, 'manifest.json'))) continue;
         const manifest = this.readManifest(agentDir);
         agents.push(this.buildAgent(name, agentDir, manifest, 'global'));
       }
@@ -136,9 +143,16 @@ export class AgentManager {
 
     const statsPath = join(targetDir, 'history', 'stats.json');
     if (existsSync(statsPath)) {
-      const stats = JSON.parse(readFileSync(statsPath, 'utf-8'));
-      stats.agent = targetName;
-      writeFileSync(statsPath, JSON.stringify(stats, null, 2));
+      try {
+        const stats = JSON.parse(readFileSync(statsPath, 'utf-8'));
+        stats.agent = targetName;
+        writeFileSync(statsPath, JSON.stringify(stats, null, 2));
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          throw new Error(`Failed to parse ${statsPath}: ${(error as SyntaxError).message}`);
+        }
+        throw error;
+      }
     }
 
     return this.buildAgent(targetName, targetDir, manifest, 'global');
@@ -146,7 +160,19 @@ export class AgentManager {
 
   private readManifest(agentDir: string): AgentManifest {
     const manifestPath = join(agentDir, 'manifest.json');
-    return JSON.parse(readFileSync(manifestPath, 'utf-8')) as AgentManifest;
+    try {
+      const data = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+      const validation = validateManifest(data);
+      if (!validation.valid) {
+        throw new Error(`Invalid manifest in ${manifestPath}: ${validation.errors.join(', ')}`);
+      }
+      return data as AgentManifest;
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(`Failed to parse ${manifestPath}: ${(error as SyntaxError).message}`);
+      }
+      throw error;
+    }
   }
 
   private buildAgent(

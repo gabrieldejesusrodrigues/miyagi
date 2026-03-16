@@ -46,7 +46,14 @@ export class SessionManager {
 
   private loadAll(): SessionEntry[] {
     if (!existsSync(this.sessionsPath)) return [];
-    return JSON.parse(readFileSync(this.sessionsPath, 'utf-8'));
+    try {
+      return JSON.parse(readFileSync(this.sessionsPath, 'utf-8'));
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(`Failed to parse sessions.json at ${this.sessionsPath}: ${error.message}`);
+      }
+      throw error;
+    }
   }
 
   private saveAll(sessions: SessionEntry[]): void {

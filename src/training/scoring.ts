@@ -11,13 +11,13 @@ export function calculateElo(
   const expectedLoser = 1 - expectedWinner;
 
   if (outcome === 'draw') {
-    const winnerNew = Math.round(winnerRating + K_FACTOR * (0.5 - expectedWinner));
-    const loserNew = Math.round(loserRating + K_FACTOR * (0.5 - expectedLoser));
+    const winnerNew = Math.max(0, Math.round(winnerRating + K_FACTOR * (0.5 - expectedWinner)));
+    const loserNew = Math.max(0, Math.round(loserRating + K_FACTOR * (0.5 - expectedLoser)));
     return { winnerNew, loserNew };
   }
 
-  const winnerNew = Math.round(winnerRating + K_FACTOR * (1 - expectedWinner));
-  const loserNew = Math.round(loserRating + K_FACTOR * (0 - expectedLoser));
+  const winnerNew = Math.max(0, Math.round(winnerRating + K_FACTOR * (1 - expectedWinner)));
+  const loserNew = Math.max(0, Math.round(loserRating + K_FACTOR * (0 - expectedLoser)));
   return { winnerNew, loserNew };
 }
 

@@ -84,24 +84,36 @@ export class ClaudeBridge {
     });
   }
 
-  async runAndCapture(args: string[]): Promise<string> {
+  async runAndCapture(args: string[], timeout: number = 300_000): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = this.spawnNonInteractive(args);
       let stdout = '';
       let stderr = '';
+      let killed = false;
+
+      const timer = setTimeout(() => {
+        killed = true;
+        child.kill('SIGTERM');
+      }, timeout);
 
       child.stdout?.on('data', (data) => { stdout += data.toString(); });
       child.stderr?.on('data', (data) => { stderr += data.toString(); });
 
       child.on('close', (code) => {
-        if (code === 0) {
+        clearTimeout(timer);
+        if (killed) {
+          reject(new Error(`Claude process timed out after ${timeout}ms`));
+        } else if (code === 0) {
           resolve(stdout);
         } else {
           reject(new Error(`Claude exited with code ${code}: ${stderr}`));
         }
       });
 
-      child.on('error', reject);
+      child.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
     });
   }
 }

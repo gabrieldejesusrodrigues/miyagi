@@ -3,6 +3,7 @@ import { join } from 'path';
 import type { AgentStats, BattleResult, JudgeVerdict } from '../types/index.js';
 import type { AgentManager } from '../core/agent-manager.js';
 import { updateDimensionScores } from './scoring.js';
+import { validateStatsJson } from '../utils/validators.js';
 
 export class HistoryManager {
   private readonly agentManager: AgentManager;
@@ -16,7 +17,19 @@ export class HistoryManager {
     if (!agent) throw new Error(`Agent "${agentName}" not found`);
 
     const statsPath = join(agent.historyDir, 'stats.json');
-    return JSON.parse(readFileSync(statsPath, 'utf-8')) as AgentStats;
+    try {
+      const data = JSON.parse(readFileSync(statsPath, 'utf-8'));
+      const validation = validateStatsJson(data);
+      if (!validation.valid) {
+        throw new Error(`Invalid stats.json for "${agentName}": ${validation.errors.join(', ')}`);
+      }
+      return data as AgentStats;
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(`Failed to parse stats.json for "${agentName}": ${error.message}`);
+      }
+      throw error;
+    }
   }
 
   async recordBattle(agentName: string, result: BattleResult): Promise<void> {
@@ -24,7 +37,15 @@ export class HistoryManager {
     if (!agent) throw new Error(`Agent "${agentName}" not found`);
 
     const battlesPath = join(agent.historyDir, 'battles.json');
-    const battles = JSON.parse(readFileSync(battlesPath, 'utf-8'));
+    let battles: unknown[];
+    try {
+      battles = JSON.parse(readFileSync(battlesPath, 'utf-8'));
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(`Failed to parse battles.json for "${agentName}": ${error.message}`);
+      }
+      throw error;
+    }
     battles.push({
       id: result.config.id,
       mode: result.config.mode,
@@ -62,7 +83,8 @@ export class HistoryManager {
 
     // Save
     const agent = await this.agentManager.get(agentName);
-    const statsPath = join(agent!.historyDir, 'stats.json');
+    if (!agent) throw new Error(`Agent "${agentName}" not found`);
+    const statsPath = join(agent.historyDir, 'stats.json');
     writeFileSync(statsPath, JSON.stringify(stats, null, 2));
   }
 
@@ -83,7 +105,8 @@ export class HistoryManager {
     });
 
     const agent = await this.agentManager.get(agentName);
-    const statsPath = join(agent!.historyDir, 'stats.json');
+    if (!agent) throw new Error(`Agent "${agentName}" not found`);
+    const statsPath = join(agent.historyDir, 'stats.json');
     writeFileSync(statsPath, JSON.stringify(stats, null, 2));
   }
 }

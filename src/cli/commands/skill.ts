@@ -1,4 +1,7 @@
 import type { Command } from 'commander';
+import { ConfigManager } from '../../core/config.js';
+import { AgentManager } from '../../core/agent-manager.js';
+import { SkillManager } from '../../core/skill-manager.js';
 
 export function registerSkillCommands(program: Command): void {
   program
@@ -8,7 +11,17 @@ export function registerSkillCommands(program: Command): void {
     .argument('<agent>', 'Target agent')
     .description('Install a skill into an agent')
     .action(async (type, source, agent) => {
-      console.log(`Installing ${type} ${source} into ${agent}`);
+      if (type === 'skill') {
+        const config = new ConfigManager();
+        config.ensureDirectories();
+        const agentManager = new AgentManager(config, process.cwd());
+        const skillManager = new SkillManager(agentManager);
+        await skillManager.install(source, agent);
+        console.log(`Skill "${source}" installed into agent "${agent}".`);
+      } else {
+        console.error(`Unknown type "${type}". Supported types: skill`);
+        process.exit(1);
+      }
     });
 
   program
@@ -17,6 +30,16 @@ export function registerSkillCommands(program: Command): void {
     .argument('<agent>', 'Target agent')
     .description('Update skills for an agent')
     .action(async (type, agent) => {
-      console.log(`Updating ${type} for ${agent}`);
+      if (type === 'skills') {
+        const config = new ConfigManager();
+        config.ensureDirectories();
+        const agentManager = new AgentManager(config, process.cwd());
+        const skillManager = new SkillManager(agentManager);
+        await skillManager.updateAll(agent);
+        console.log(`Skills for agent "${agent}" updated successfully.`);
+      } else {
+        console.error(`Unknown type "${type}". Supported types: skills`);
+        process.exit(1);
+      }
     });
 }

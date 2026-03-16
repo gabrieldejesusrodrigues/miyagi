@@ -7,7 +7,7 @@ const TREND_ICONS: Record<string, string> = {
 };
 
 function bar(value: number, max: number = 10, width: number = 20): string {
-  const filled = Math.round((value / max) * width);
+  const filled = Math.max(0, Math.min(width, Math.round((value / max) * width)));
   const empty = width - filled;
   return '[' + '#'.repeat(filled) + '-'.repeat(empty) + ']';
 }

@@ -3,6 +3,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import type { JudgeVerdict } from '../types/index.js';
 import type { AgentManager } from '../core/agent-manager.js';
+import { extractBalancedJson } from '../utils/json-parser.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -67,12 +68,12 @@ export class Coach {
   }
 
   parseCoachingResponse(raw: string): CoachingResult {
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    const jsonStr = extractBalancedJson(raw);
+    if (!jsonStr) {
       throw new Error('Failed to parse coaching response: no JSON found');
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(jsonStr);
 
     if (!parsed.changes || !Array.isArray(parsed.changes)) {
       throw new Error('Coaching response missing changes array');

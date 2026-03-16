@@ -1,12 +1,5 @@
 import type { Command } from 'commander';
-import { ConfigManager } from '../../core/config.js';
-import { AgentManager } from '../../core/agent-manager.js';
-import { readdirSync, readFileSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { TemplateLoader } from '../../core/template-loader.js';
 
 export function registerTemplatesCommand(program: Command): void {
   program
@@ -16,22 +9,17 @@ export function registerTemplatesCommand(program: Command): void {
     .description('Manage agent templates')
     .action(async (action, source) => {
       if (action === 'list') {
-        const templatesDir = join(__dirname, '..', '..', 'templates');
-        if (!existsSync(templatesDir)) {
+        const loader = new TemplateLoader();
+        const templates = loader.list();
+
+        if (templates.length === 0) {
           console.log('No templates found.');
           return;
         }
 
-        const templates = readdirSync(templatesDir, { withFileTypes: true })
-          .filter(d => d.isDirectory());
-
         console.log('Available templates:');
-        for (const dir of templates) {
-          const manifestPath = join(templatesDir, dir.name, 'manifest.json');
-          if (existsSync(manifestPath)) {
-            const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-            console.log(`  ${manifest.name.padEnd(20)} ${manifest.description ?? ''}`);
-          }
+        for (const template of templates) {
+          console.log(`  ${template.name.padEnd(20)} ${template.description}`);
         }
       } else {
         console.log(`Templates ${action}: ${source ?? '(none)'}`);
