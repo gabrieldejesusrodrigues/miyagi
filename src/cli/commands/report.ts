@@ -32,8 +32,21 @@ export function registerReportCommand(program: Command): void {
         const outputPath = options.output ?? join(config.reportsDir, `${target}-profile.html`);
         generator.generateProfileReport(target, stats, outputPath, agent.manifest.description);
         console.log(`Profile report generated: ${outputPath}`);
+      } else if (options.type === 'battle') {
+        const battleData = history.getBattleData(config.reportsDir, target);
+        if (!battleData) {
+          console.error(`Battle data not found for ID "${target}". Only battles run after this update have stored data.`);
+          process.exit(1);
+        }
+        const outputPath = options.output ?? join(config.reportsDir, `battle-${target}.html`);
+        generator.generateBattleReport(battleData.result, battleData.verdict, outputPath);
+        console.log(`Battle report generated: ${outputPath}`);
+        if (options.open) {
+          const { exec } = await import('child_process');
+          exec(`xdg-open "${outputPath}" || open "${outputPath}"`);
+        }
       } else {
-        console.log(`Report type "${options.type}" generation requires battle data.`);
+        console.log(`Report type "${options.type}" is not yet supported.`);
       }
     });
 }

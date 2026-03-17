@@ -131,6 +131,9 @@ export function registerBattleCommand(program: Command): void {
         await history.updateStats(agent1, result, verdict);
         await history.updateStats(agent2, result, verdict);
 
+        // Save full battle data for report generation
+        history.saveBattleData(config.reportsDir, battleConfig.id, result, verdict);
+
         console.log(`\nBattle ID: ${battleConfig.id}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

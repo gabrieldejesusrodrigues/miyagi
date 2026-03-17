@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, appendFileSync } from 'fs';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import type { AgentStats, BattleResult, JudgeVerdict } from '../types/index.js';
 import type { AgentManager } from '../core/agent-manager.js';
@@ -108,5 +108,36 @@ export class HistoryManager {
     if (!agent) throw new Error(`Agent "${agentName}" not found`);
     const statsPath = join(agent.historyDir, 'stats.json');
     writeFileSync(statsPath, JSON.stringify(stats, null, 2));
+  }
+
+  saveBattleData(reportsDir: string, battleId: string, result: BattleResult, verdict: JudgeVerdict): void {
+    if (!/^[a-zA-Z0-9_-]+$/.test(battleId)) {
+      throw new Error(`Invalid battle ID: "${battleId}"`);
+    }
+    const battleDataDir = join(reportsDir, 'battle-data');
+    if (!existsSync(battleDataDir)) {
+      mkdirSync(battleDataDir, { recursive: true });
+    }
+    const filePath = join(battleDataDir, `${battleId}.json`);
+    writeFileSync(filePath, JSON.stringify({ result, verdict }, null, 2), 'utf-8');
+  }
+
+  getBattleData(reportsDir: string, battleId: string): { result: BattleResult; verdict: JudgeVerdict } | null {
+    if (!/^[a-zA-Z0-9_-]+$/.test(battleId)) {
+      throw new Error(`Invalid battle ID: "${battleId}"`);
+    }
+    const filePath = join(reportsDir, 'battle-data', `${battleId}.json`);
+    if (!existsSync(filePath)) {
+      return null;
+    }
+    const raw = readFileSync(filePath, 'utf-8');
+    try {
+      return JSON.parse(raw) as { result: BattleResult; verdict: JudgeVerdict };
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(`Failed to parse battle data for "${battleId}": ${error.message}`);
+      }
+      throw error;
+    }
   }
 }
