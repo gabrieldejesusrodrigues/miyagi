@@ -7,7 +7,8 @@ import { ClaudeBridge } from '../../core/claude-bridge.js';
 import { Judge } from '../../training/judge.js';
 import { HistoryManager } from '../../training/history.js';
 import { Coach } from '../../training/coach.js';
-import type { BattleMode, JudgeVerdict } from '../../types/index.js';
+import type { BattleMode, JudgeVerdict, BattleProgressCallback } from '../../types/index.js';
+import { createProgressCallback } from '../display/battle-display.js';
 
 export function registerBattleCommand(program: Command): void {
   program
@@ -62,12 +63,13 @@ export function registerBattleCommand(program: Command): void {
         const bridge = new ClaudeBridge();
         const history = new HistoryManager(agentManager);
 
-        console.log('\nStarting battle...');
+        const onProgress: BattleProgressCallback = createProgressCallback();
+        onProgress({ phase: 'setup', type: 'start', message: `${agent1} vs ${agent2}` });
 
         const effort = options.effort as string;
         const result = modeConfig.type === 'symmetric'
-          ? await engine.runSymmetric(battleConfig, agentManager, bridge, effort)
-          : await engine.runAsymmetric(battleConfig, agentManager, bridge, effort);
+          ? await engine.runSymmetric(battleConfig, agentManager, bridge, effort, onProgress)
+          : await engine.runAsymmetric(battleConfig, agentManager, bridge, effort, onProgress);
 
         // Print round summaries
         console.log(`\n--- Battle Complete (${result.terminationReason}) ---`);
@@ -82,7 +84,8 @@ export function registerBattleCommand(program: Command): void {
         }
 
         // Judge evaluation
-        console.log('\nRunning judge evaluation (this may take a few minutes with opus)...');
+        onProgress({ phase: 'judge', type: 'start' });
+        const judgeStart = Date.now();
         const judge = new Judge();
         const evalPrompt = judge.buildEvaluationPrompt(result);
         const judgeOpts = {
@@ -103,12 +106,13 @@ export function registerBattleCommand(program: Command): void {
             break;
           } catch (parseErr) {
             if (attempt < maxRetries) {
-              console.log(`Judge response could not be parsed (attempt ${attempt}/${maxRetries}), retrying...`);
+              onProgress({ phase: 'judge', type: 'info', message: `Parse failed (attempt ${attempt}/${maxRetries}), retrying...` });
             } else {
               throw parseErr;
             }
           }
         }
+        onProgress({ phase: 'judge', type: 'complete', elapsedMs: Date.now() - judgeStart });
 
         // Print verdict
         console.log('\n--- Judge Verdict ---');
@@ -136,12 +140,12 @@ export function registerBattleCommand(program: Command): void {
         history.saveBattleData(config.reportsDir, battleConfig.id, result, verdict);
 
         // Auto-train both agents
-        console.log('\nRunning Mr. Miyagi coaching for both agents...');
         const coach = new Coach(agentManager);
 
         for (const trainAgent of [agent1, agent2]) {
           try {
-            console.log(`\nCoaching ${trainAgent}...`);
+            onProgress({ phase: 'coach', type: 'start', agent: trainAgent });
+            const coachStart = Date.now();
             const agentFiles = await coach.getAgentFiles(trainAgent);
             const agentObj = await agentManager.get(trainAgent);
             const coachIdentity = coach.getIdentity();
@@ -187,13 +191,15 @@ export function registerBattleCommand(program: Command): void {
             await history.appendTrainingLog(trainAgent, `Auto-coach after battle ${battleConfig.id}: ${coachingResult!.summary}`);
             await history.addCoachNote(trainAgent, coachingResult!.summary);
 
-            console.log(`  ${trainAgent}: ${coachingResult!.changes.length} changes applied`);
-            console.log(`  Summary: ${coachingResult!.summary.slice(0, 150)}...`);
+            onProgress({ phase: 'coach', type: 'complete', agent: trainAgent, elapsedMs: Date.now() - coachStart });
+            console.log(`    ${coachingResult!.changes.length} changes applied`);
+            console.log(`    Summary: ${coachingResult!.summary}`);
           } catch (trainErr) {
             console.error(`  Warning: Coaching failed for ${trainAgent}: ${trainErr instanceof Error ? trainErr.message : String(trainErr)}`);
           }
         }
 
+        onProgress({ phase: 'complete', type: 'complete' });
         console.log(`\nBattle ID: ${battleConfig.id}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
