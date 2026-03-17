@@ -10,7 +10,7 @@ const CODE_EXTENSIONS = new Set([
   '.md', '.txt', '.toml', '.cfg', '.ini',
 ]);
 
-function collectGeneratedFiles(dir: string, maxTotalSize = 15_000): string {
+function collectGeneratedFiles(dir: string, maxTotalSize = 30_000): string {
   const files: Array<{ path: string; content: string }> = [];
   let totalSize = 0;
 
