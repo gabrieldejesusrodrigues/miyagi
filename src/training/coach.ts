@@ -41,17 +41,19 @@ export class Coach {
     verdict: JudgeVerdict,
     agentIdentity: string = '',
     agentManifest: { description?: string; domains?: string[]; templateOrigin?: string } = {},
+    battleTranscript: string = '',
   ): string {
     const isAgentA = verdict.agentAAnalysis.agent === agentName;
     const analysis = isAgentA ? verdict.agentAAnalysis : verdict.agentBAnalysis;
     const priorities = isAgentA ? verdict.coachingPriorities.agentA : verdict.coachingPriorities.agentB;
 
-    let prompt = `Train agent: ${agentName}\n\n`;
+    let prompt = `You are coaching student "${agentName}" after a battle. Be CRITICAL and REALISTIC — do not sugarcoat.\n\n`;
+
     prompt += `## Battle Result\n`;
     prompt += `Winner: ${verdict.winner}\n`;
     prompt += `Reason: ${verdict.reason}\n\n`;
 
-    prompt += `## Agent Analysis\n`;
+    prompt += `## Judge's Analysis of This Student\n`;
     prompt += `Strengths: ${analysis.strengths.join(', ')}\n`;
     prompt += `Weaknesses: ${analysis.weaknesses.join(', ')}\n`;
     prompt += `Missed Opportunities: ${analysis.missedOpportunities.join(', ')}\n\n`;
@@ -61,12 +63,16 @@ export class Coach {
       prompt += `- ${dim}: ${score}/10\n`;
     }
 
-    prompt += `\n## Coaching Priorities\n`;
+    prompt += `\n## Coaching Priorities (from Judge)\n`;
     for (const priority of priorities) {
       prompt += `- ${priority}\n`;
     }
 
-    prompt += `\n## Comparative Context\n${verdict.comparativeAnalysis}\n`;
+    prompt += `\n## Judge's Comparative Analysis\n${verdict.comparativeAnalysis}\n`;
+
+    if (battleTranscript) {
+      prompt += `\n## Full Battle Transcript\nRead the student's actual output carefully. Base your coaching on what they ACTUALLY did, not what the judge summarized.\n${battleTranscript}\n`;
+    }
 
     if (agentIdentity) {
       prompt += `\n## Student "${agentName}" — Current identity.md (this is the file you will modify)\n\`\`\`\n${agentIdentity}\n\`\`\`\n`;
@@ -84,16 +90,10 @@ export class Coach {
       prompt += `\n## Student's Template Origin\n${agentManifest.templateOrigin}\n`;
     }
 
-    prompt += `\n## CRITICAL COACHING RULES\n`;
-    prompt += `You are Mr. Miyagi, the coach. The student you are training is "${agentName}" (shown above). Your coaching changes MUST be domain-specific and tailored to this student's role:\n`;
-    prompt += `- If the student is a developer/coding agent: prescribe specific coding practices, design patterns, TDD techniques, code review approaches, architectural principles. Reference concrete programming concepts.\n`;
-    prompt += `- If the student is a sales agent: prescribe specific sales techniques (SPIN selling, Challenger Sale, MEDDIC), objection handling frameworks, discovery questions, closing strategies. Reference concrete sales methodology.\n`;
-    prompt += `- If the student is a support agent: prescribe specific support frameworks (active listening, empathy mapping, escalation protocols, resolution tracking). Reference concrete customer service methodologies.\n`;
-    prompt += `- If the student is a writer agent: prescribe specific writing techniques (structure, voice, audience awareness, editing frameworks). Reference concrete writing methodology.\n`;
-    prompt += `- If the student is a business analyst: prescribe specific BA techniques (requirements gathering, stakeholder mapping, process modeling, acceptance criteria). Reference concrete BA methodology.\n`;
-    prompt += `- For ANY student type: coaching must reference the student's existing identity shown above, build on their current strengths, and prescribe improvements using the vocabulary and frameworks of their specific domain.\n`;
-    prompt += `- NEVER give generic advice like "be more strategic" or "improve communication". Every suggestion must be a concrete, actionable technique from the student's domain.\n`;
-    prompt += `- Read the student's current identity carefully and make changes that ENHANCE it, not replace it with generic content.\n`;
+    prompt += `\n## REMINDERS\n`;
+    prompt += `- You are Mr. Miyagi. The student you are coaching is "${agentName}" (shown above). Follow your identity instructions for tone, specialization, and domain-specific coaching.\n`;
+    prompt += `- Reference specific rounds and outputs from the battle transcript in your coaching reasons.\n`;
+    prompt += `- Make the student a deeper SPECIALIST in their domain — do not generalize.\n`;
 
     prompt += `\nProvide your coaching changes as a JSON object.`;
 

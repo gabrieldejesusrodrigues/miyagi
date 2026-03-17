@@ -1,9 +1,9 @@
 import type { Command } from 'commander';
-import { ConfigManager } from '../../core/config.js';
-import { AgentManager } from '../../core/agent-manager.js';
-import { HistoryManager } from '../../training/history.js';
-import { ReportGenerator } from '../../reports/generator.js';
 import { join } from 'path';
+import { AgentManager } from '../../core/agent-manager.js';
+import { ConfigManager } from '../../core/config.js';
+import { ReportGenerator } from '../../reports/generator.js';
+import { HistoryManager } from '../../training/history.js';
 
 export function registerReportCommand(program: Command): void {
   program

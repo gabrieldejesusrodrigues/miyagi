@@ -81,12 +81,13 @@ describe('Coach.buildCoachingPrompt() with identity and manifest', () => {
     expect(prompt).toContain('debugging');
   });
 
-  it('includes domain-specific coaching rules', () => {
+  it('includes coaching reminders with student name', () => {
     const identity = '# Alpha\n\nAgent.';
     const manifest = {};
     const prompt = coach.buildCoachingPrompt('alpha', mockVerdict, identity, manifest);
-    expect(prompt).toContain('CRITICAL COACHING RULES');
-    expect(prompt).toContain('domain-specific');
+    expect(prompt).toContain('REMINDERS');
+    expect(prompt).toContain('student you are coaching is "alpha"');
+    expect(prompt).toContain('SPECIALIST');
   });
 
   it('includes template origin when present', () => {
@@ -102,7 +103,7 @@ describe('Coach.buildCoachingPrompt() with identity and manifest', () => {
     const prompt = coach.buildCoachingPrompt('alpha', mockVerdict, identity, manifest);
     expect(prompt).toContain('alpha');
     expect(prompt).toContain('# Alpha');
-    expect(prompt).toContain('CRITICAL COACHING RULES');
+    expect(prompt).toContain('REMINDERS');
   });
 
   it('coaching prompt for developer agent mentions coding/programming concepts', () => {
@@ -110,6 +111,24 @@ describe('Coach.buildCoachingPrompt() with identity and manifest', () => {
     const manifest = { domains: ['coding'], description: 'A developer agent' };
     const prompt = coach.buildCoachingPrompt('alpha', mockVerdict, identity, manifest);
     expect(prompt).toMatch(/coding|programming|TDD|design pattern|refactor|architectural/i);
+  });
+
+  it('includes battle transcript when provided', () => {
+    const identity = '# Alpha\n\nAgent.';
+    const manifest = {};
+    const transcript = '### Round 1\nStudent "alpha" output:\nHello world code\n\nOpponent "beta" output:\nBetter code\n';
+    const prompt = coach.buildCoachingPrompt('alpha', mockVerdict, identity, manifest, transcript);
+    expect(prompt).toContain('Full Battle Transcript');
+    expect(prompt).toContain('Student "alpha" output');
+    expect(prompt).toContain('Hello world code');
+    expect(prompt).toContain('Opponent "beta" output');
+  });
+
+  it('prompt is critical in tone', () => {
+    const identity = '# Alpha\n\nAgent.';
+    const manifest = {};
+    const prompt = coach.buildCoachingPrompt('alpha', mockVerdict, identity, manifest);
+    expect(prompt).toContain('CRITICAL and REALISTIC');
   });
 
   it('coaching prompt for sales agent mentions sales concepts', () => {

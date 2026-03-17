@@ -42,7 +42,12 @@ export class Judge {
     }
 
     prompt += `\nTermination reason: ${result.terminationReason}\n`;
-    prompt += `\nIMPORTANT: Before scoring, verify that each contestant actually fulfilled the requirements in the Original Task. Do not give high Task Completion scores to contestants who only described what they would do without delivering a working solution.\n`;
+    prompt += `\nIMPORTANT EVALUATION RULES:\n`;
+    prompt += `- Each contestant's output may include an "Actual Generated Files" section showing the real files they created (code, documents, configs, templates, etc.). If present, evaluate the ACTUAL FILE CONTENTS, not just the contestant's description of their work. Descriptions can be misleading — the files are the truth.\n`;
+    prompt += `- Verify the generated files against the task requirements: if the task asked for specific features, methods, sections, or deliverables, check that the files actually contain them.\n`;
+    prompt += `- If a contestant claims success but the actual files show bugs, missing requirements, incomplete implementations, or low-quality output, score Task Completion accordingly.\n`;
+    prompt += `- Do not give high Task Completion scores to contestants who only described what they would do without delivering actual files or working solutions.\n`;
+    prompt += `- In your analysis, reference specific details from the actual generated files when available.\n`;
     prompt += `\nProvide your evaluation as a compact JSON object. Be concise — keep narrative under 200 words and each analysis field under 100 words. Output ONLY the JSON, no markdown fences.`;
 
     return prompt;

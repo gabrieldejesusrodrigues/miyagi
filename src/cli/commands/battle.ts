@@ -146,23 +146,49 @@ export function registerBattleCommand(program: Command): void {
             const agentObj = await agentManager.get(trainAgent);
             const coachIdentity = coach.getIdentity();
 
-            const coachingPrompt = coach.buildCoachingPrompt(trainAgent, verdict, agentFiles.identity, agentObj!.manifest);
+            // Build battle transcript for the coach (only this student's outputs, truncated)
+            const MAX_OUTPUT_LEN = 3000;
+            let transcript = '';
+            for (const round of result.rounds) {
+              const isAgentA = result.config.agentA === trainAgent;
+              const studentOutput = (isAgentA ? round.agentAResponse : round.agentBResponse).slice(0, MAX_OUTPUT_LEN);
+              const opponentOutput = (isAgentA ? round.agentBResponse : round.agentAResponse).slice(0, MAX_OUTPUT_LEN);
+              const opponentName = isAgentA ? result.config.agentB : result.config.agentA;
+              transcript += `### Round ${round.round}\n`;
+              transcript += `Student "${trainAgent}" output:\n${studentOutput}\n\n`;
+              transcript += `Opponent "${opponentName}" output (for comparison):\n${opponentOutput}\n\n`;
+            }
+
+            const coachingPrompt = coach.buildCoachingPrompt(trainAgent, verdict, agentFiles.identity, agentObj!.manifest, transcript);
             const coachOpts = {
               systemPrompt: coachIdentity,
               prompt: coachingPrompt,
               effort: ['high', 'max'].includes(effort) ? effort : 'medium',
             };
 
-            const rawResponse = await bridge.runAndCapture(
-              bridge.buildBattleArgs(coachOpts), 600_000, bridge.buildBattleStdin(coachOpts),
-            );
-            const coachingResult = coach.parseCoachingResponse(rawResponse);
-            await coach.applyChanges(trainAgent, coachingResult);
-            await history.appendTrainingLog(trainAgent, `Auto-coach after battle ${battleConfig.id}: ${coachingResult.summary}`);
-            await history.addCoachNote(trainAgent, coachingResult.summary);
+            let coachingResult;
+            const maxCoachRetries = 2;
+            for (let attempt = 1; attempt <= maxCoachRetries; attempt++) {
+              const rawResponse = await bridge.runAndCapture(
+                bridge.buildBattleArgs(coachOpts), 600_000, bridge.buildBattleStdin(coachOpts),
+              );
+              try {
+                coachingResult = coach.parseCoachingResponse(rawResponse);
+                break;
+              } catch (parseErr) {
+                if (attempt < maxCoachRetries) {
+                  console.log(`  Coach response could not be parsed (attempt ${attempt}/${maxCoachRetries}), retrying...`);
+                } else {
+                  throw parseErr;
+                }
+              }
+            }
+            await coach.applyChanges(trainAgent, coachingResult!);
+            await history.appendTrainingLog(trainAgent, `Auto-coach after battle ${battleConfig.id}: ${coachingResult!.summary}`);
+            await history.addCoachNote(trainAgent, coachingResult!.summary);
 
-            console.log(`  ${trainAgent}: ${coachingResult.changes.length} changes applied`);
-            console.log(`  Summary: ${coachingResult.summary.slice(0, 150)}...`);
+            console.log(`  ${trainAgent}: ${coachingResult!.changes.length} changes applied`);
+            console.log(`  Summary: ${coachingResult!.summary.slice(0, 150)}...`);
           } catch (trainErr) {
             console.error(`  Warning: Coaching failed for ${trainAgent}: ${trainErr instanceof Error ? trainErr.message : String(trainErr)}`);
           }

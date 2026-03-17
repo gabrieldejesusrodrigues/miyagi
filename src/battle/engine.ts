@@ -1,7 +1,51 @@
 import { randomUUID } from 'crypto';
-import { readFileSync, mkdtempSync, rmSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, mkdtempSync, rmSync, readdirSync, statSync } from 'fs';
+import { join, extname } from 'path';
 import { tmpdir } from 'os';
+
+const CODE_EXTENSIONS = new Set([
+  '.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.go', '.rs', '.rb',
+  '.c', '.cpp', '.h', '.cs', '.php', '.swift', '.kt', '.scala',
+  '.sh', '.bash', '.sql', '.html', '.css', '.json', '.yaml', '.yml',
+  '.md', '.txt', '.toml', '.cfg', '.ini',
+]);
+
+function collectGeneratedFiles(dir: string, maxTotalSize = 15_000): string {
+  const files: Array<{ path: string; content: string }> = [];
+  let totalSize = 0;
+
+  function walk(currentDir: string, prefix: string): void {
+    let entries;
+    try { entries = readdirSync(currentDir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const BLACKLIST_DIRS = new Set(['.omc', 'node_modules', '__pycache__', '.git', '.venv', 'venv', '.tox', '.mypy_cache', '.pytest_cache', 'dist', 'build', '.next', '.nuxt', 'coverage', '.cache']);
+      const BLACKLIST_FILES = new Set(['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'poetry.lock', 'Pipfile.lock', '.DS_Store', 'thumbs.db']);
+      if (BLACKLIST_DIRS.has(entry.name)) continue;
+      const fullPath = join(currentDir, entry.name);
+      const relPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        walk(fullPath, relPath);
+      } else if (entry.isFile() && CODE_EXTENSIONS.has(extname(entry.name).toLowerCase()) && !BLACKLIST_FILES.has(entry.name)) {
+        try {
+          const size = statSync(fullPath).size;
+          if (size > 5_000 || totalSize + size > maxTotalSize) continue;
+          const content = readFileSync(fullPath, 'utf-8');
+          files.push({ path: relPath, content });
+          totalSize += size;
+        } catch { /* skip unreadable */ }
+      }
+    }
+  }
+
+  walk(dir, '');
+  if (files.length === 0) return '';
+
+  let result = '\n\n--- Actual Generated Files ---\n';
+  for (const f of files) {
+    result += `\n<file path="${f.path}">\n${f.content}\n</file>\n`;
+  }
+  return result;
+}
 import type {
   BattleConfig, BattleMode, BattleRound, BattleResult,
 } from '../types/index.js';
@@ -110,10 +154,14 @@ export class BattleEngine {
       const tempDirB = mkdtempSync(join(tmpdir(), 'miyagi-battle-'));
 
       try {
-        const [agentAResponse, agentBResponse] = await Promise.all([
-          bridge.runAndCapture(bridge.buildBattleArgs(optsA), undefined, bridge.buildBattleStdin(optsA), tempDirA),
-          bridge.runAndCapture(bridge.buildBattleArgs(optsB), undefined, bridge.buildBattleStdin(optsB), tempDirB),
+        const [rawResponseA, rawResponseB] = await Promise.all([
+          bridge.runAndCapture(bridge.buildBattleArgs(optsA), 600_000, bridge.buildBattleStdin(optsA), tempDirA),
+          bridge.runAndCapture(bridge.buildBattleArgs(optsB), 600_000, bridge.buildBattleStdin(optsB), tempDirB),
         ]);
+        // Only collect generated files on the LAST round to keep prompt size manageable
+        const isLastRound = round === config.maxRounds;
+        const agentAResponse = rawResponseA + (isLastRound ? collectGeneratedFiles(tempDirA) : '');
+        const agentBResponse = rawResponseB + (isLastRound ? collectGeneratedFiles(tempDirB) : '');
         rounds.push({ round, agentAResponse, agentBResponse, timestamp: new Date().toISOString() });
       } finally {
         rmSync(tempDirA, { recursive: true, force: true });
@@ -153,12 +201,13 @@ export class BattleEngine {
       for (let round = 1; round <= config.maxRounds; round++) {
         const turnPromptA = mediator.buildTurnPrompt(rolePrompts.agentA, history, round, config.maxRounds);
         const optsA = { systemPrompt: identityA, prompt: turnPromptA, effort, dangerouslySkipPermissions: true };
-        const responseA = await bridge.runAndCapture(
+        const rawResponseA = await bridge.runAndCapture(
           bridge.buildBattleArgs(optsA), undefined, bridge.buildBattleStdin(optsA), tempDirA,
         );
+        const responseA = rawResponseA + collectGeneratedFiles(tempDirA);
         history.push({ role: config.agentA, content: responseA });
 
-        if (mediator.isNaturalEnd(responseA)) {
+        if (mediator.isNaturalEnd(rawResponseA)) {
           rounds.push({ round, agentAResponse: responseA, agentBResponse: '', timestamp: new Date().toISOString() });
           terminationReason = 'natural';
           break;
@@ -166,9 +215,10 @@ export class BattleEngine {
 
         const turnPromptB = mediator.buildTurnPrompt(rolePrompts.agentB, history, round, config.maxRounds);
         const asymOptsB = { systemPrompt: identityB, prompt: turnPromptB, effort, dangerouslySkipPermissions: true };
-        const responseB = await bridge.runAndCapture(
+        const rawResponseB = await bridge.runAndCapture(
           bridge.buildBattleArgs(asymOptsB), undefined, bridge.buildBattleStdin(asymOptsB), tempDirB,
         );
+        const responseB = rawResponseB + collectGeneratedFiles(tempDirB);
         history.push({ role: config.agentB, content: responseB });
 
         rounds.push({ round, agentAResponse: responseA, agentBResponse: responseB, timestamp: new Date().toISOString() });
