@@ -22,7 +22,9 @@ export function formatEvent(event: BattleProgressEvent): string {
 
   if (phase === 'round' && type === 'start') {
     const roundPart = `\ud83d\udccd Round ${round ?? '?'}/${totalRounds ?? '?'}`;
-    return agent ? `${roundPart} — ${agent}` : roundPart;
+    const agentPart = agent ? ` — ${agent}` : '';
+    const taskPart = message ? `\n    Task: ${message}` : '';
+    return `${roundPart}${agentPart}${taskPart}`;
   }
 
   if (phase === 'round' && type === 'info' && agent) {
@@ -32,7 +34,11 @@ export function formatEvent(event: BattleProgressEvent): string {
   if (phase === 'round' && type === 'complete') {
     if (agent) {
       const elapsed = elapsedMs !== undefined ? ` (${formatElapsed(elapsedMs)})` : '';
-      return `  \u2705 ${agent} completed${elapsed}`;
+      const MAX_PREVIEW = 200;
+      const preview = message
+        ? `\n    ${message.length > MAX_PREVIEW ? message.slice(0, MAX_PREVIEW).replace(/\n/g, ' ') + '...' : message.replace(/\n/g, ' ')}`
+        : '';
+      return `  \u2705 ${agent} completed${elapsed}${preview}`;
     }
     if (round !== undefined) {
       return `\u2705 Round ${round} complete`;

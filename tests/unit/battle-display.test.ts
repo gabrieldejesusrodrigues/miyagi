@@ -70,6 +70,19 @@ describe('formatEvent', () => {
       expect(result).toContain('claude');
     });
 
+    it('formats round/start with task message', () => {
+      const event: BattleProgressEvent = {
+        phase: 'round',
+        type: 'start',
+        round: 1,
+        totalRounds: 5,
+        message: 'TDD vs writing tests after implementation',
+      };
+      const result = formatEvent(event);
+      expect(result).toContain('Round 1/5');
+      expect(result).toContain('TDD vs writing tests after implementation');
+    });
+
     it('formats round/info with agent as responding', () => {
       const event: BattleProgressEvent = {
         phase: 'round',
@@ -105,6 +118,35 @@ describe('formatEvent', () => {
       expect(result).toContain('claude');
       expect(result).toContain('completed');
       expect(result).toContain('2.5s');
+    });
+
+    it('formats round/complete with response preview in message', () => {
+      const event: BattleProgressEvent = {
+        phase: 'round',
+        type: 'complete',
+        agent: 'claude',
+        elapsedMs: 1500,
+        message: 'I believe TDD is superior because it forces you to think about design first...',
+      };
+      const result = formatEvent(event);
+      expect(result).toContain('claude');
+      expect(result).toContain('completed');
+      expect(result).toContain('1.5s');
+      expect(result).toContain('I believe TDD is superior');
+    });
+
+    it('truncates long response previews', () => {
+      const longResponse = 'A'.repeat(300);
+      const event: BattleProgressEvent = {
+        phase: 'round',
+        type: 'complete',
+        agent: 'claude',
+        elapsedMs: 1000,
+        message: longResponse,
+      };
+      const result = formatEvent(event);
+      expect(result.length).toBeLessThan(400);
+      expect(result).toContain('...');
     });
 
     it('formats round/complete without agent as round complete', () => {

@@ -142,14 +142,15 @@ export class BattleEngine {
 
     try {
       for (let round = 1; round <= config.maxRounds; round++) {
-        if (onProgress) onProgress({ phase: 'round', type: 'start', round, totalRounds: config.maxRounds });
+        const taskLabel = config.task ?? config.topic ?? 'Complete the task.';
+        if (onProgress) onProgress({ phase: 'round', type: 'start', round, totalRounds: config.maxRounds, message: taskLabel });
 
         let taskPrompt: string;
         if (round === 1) {
-          taskPrompt = config.task ?? config.topic ?? 'Complete the task.';
+          taskPrompt = taskLabel;
         } else {
           const prev = rounds[round - 2];
-          taskPrompt = `${config.task ?? config.topic ?? 'Complete the task.'}\n\n` +
+          taskPrompt = `${taskLabel}\n\n` +
             `Previous round output:\n` +
             `${config.agentA}: ${prev.agentAResponse}\n` +
             `${config.agentB}: ${prev.agentBResponse}\n\n` +
@@ -168,8 +169,8 @@ export class BattleEngine {
           bridge.runAndCapture(bridge.buildBattleArgs(optsA), 600_000, bridge.buildBattleStdin(optsA), tempDirA),
           bridge.runAndCapture(bridge.buildBattleArgs(optsB), 600_000, bridge.buildBattleStdin(optsB), tempDirB),
         ]);
-        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentA, round, elapsedMs: Date.now() - startA });
-        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentB, round, elapsedMs: Date.now() - startB });
+        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentA, round, elapsedMs: Date.now() - startA, message: rawResponseA });
+        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentB, round, elapsedMs: Date.now() - startB, message: rawResponseB });
 
         rounds.push({ round, agentAResponse: rawResponseA, agentBResponse: rawResponseB, timestamp: new Date().toISOString() });
       }
@@ -218,7 +219,8 @@ export class BattleEngine {
 
     try {
       for (let round = 1; round <= config.maxRounds; round++) {
-        if (onProgress) onProgress({ phase: 'round', type: 'start', round, totalRounds: config.maxRounds });
+        const taskLabel = config.topic ?? config.task ?? modeConfig.description;
+        if (onProgress) onProgress({ phase: 'round', type: 'start', round, totalRounds: config.maxRounds, message: taskLabel });
 
         const turnPromptA = mediator.buildTurnPrompt(rolePrompts.agentA, history, round, config.maxRounds);
         const optsA = { systemPrompt: identityA, prompt: turnPromptA, effort, dangerouslySkipPermissions: true };
@@ -227,7 +229,7 @@ export class BattleEngine {
         const rawResponseA = await bridge.runAndCapture(
           bridge.buildBattleArgs(optsA), undefined, bridge.buildBattleStdin(optsA), tempDirA,
         );
-        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentA, round, elapsedMs: Date.now() - startA });
+        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentA, round, elapsedMs: Date.now() - startA, message: rawResponseA });
         const responseA = rawResponseA + collectGeneratedFiles(tempDirA);
         history.push({ role: config.agentA, content: responseA });
 
@@ -244,7 +246,7 @@ export class BattleEngine {
         const rawResponseB = await bridge.runAndCapture(
           bridge.buildBattleArgs(asymOptsB), undefined, bridge.buildBattleStdin(asymOptsB), tempDirB,
         );
-        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentB, round, elapsedMs: Date.now() - startB });
+        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentB, round, elapsedMs: Date.now() - startB, message: rawResponseB });
         const responseB = rawResponseB + collectGeneratedFiles(tempDirB);
         history.push({ role: config.agentB, content: responseB });
 
