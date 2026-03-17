@@ -10,6 +10,8 @@ import { registerTemplatesCommand } from './commands/templates.js';
 import { registerReportCommand } from './commands/report.js';
 import { registerSessionsCommand } from './commands/sessions.js';
 import { formatTerminalHelp } from './commands/miyagi-help.js';
+import { runBattleBackground } from '../battle/runner.js';
+import { ConfigManager } from '../core/config.js';
 
 export function createProgram(): Command {
   const program = new Command();
@@ -46,6 +48,16 @@ export function createProgram(): Command {
     .description('Display detailed help for miyagi CLI')
     .action(() => {
       console.log(formatTerminalHelp());
+    });
+
+  // Hidden command used by background battle launcher
+  program
+    .command('__run-battle', { hidden: true })
+    .argument('<battle-id>')
+    .action(async (battleId: string) => {
+      const cfg = new ConfigManager();
+      cfg.ensureDirectories();
+      await runBattleBackground(battleId, cfg);
     });
 
   return program;
