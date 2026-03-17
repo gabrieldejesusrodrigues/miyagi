@@ -36,9 +36,9 @@ src/
   templates/                     # 5 built-in agent templates (salesman, developer, etc.)
   builtin-agents/                # miyagi-judge, mr-miyagi identity files
   types/                         # All TypeScript interfaces (barrel: types/index.ts)
-  utils/                         # Validators, archive helpers
+  utils/                         # Validators, archive helpers, JSON parser
 tests/
-  unit/                          # 22 unit test files
+  unit/                          # 38 unit test files (292 tests)
   integration/                   # 2 integration test files (create-agent, full-flow)
 ```
 
@@ -47,35 +47,41 @@ tests/
 Each directory is an independent area. Agents working on one area should not need to touch others unless fixing cross-cutting bugs.
 
 ### `src/core/` — Core Infrastructure
-- `config.ts` — ConfigManager: loads/saves `~/.miyagi/config.json`, manages directory structure
+- `config.ts` — ConfigManager: loads/saves `~/.miyagi/config.json`, manages directory structure (`agentsDir`, `templatesDir`, `reportsDir`)
 - `agent-manager.ts` — AgentManager: CRUD for agents in `~/.miyagi/agents/`
 - `skill-manager.ts` — SkillManager: list/install/remove skills per agent
 - `session-manager.ts` — SessionManager: records Claude session history
-- `claude-bridge.ts` — ClaudeBridge: spawns `claude` CLI processes, builds arg arrays
+- `claude-bridge.ts` — ClaudeBridge: spawns `claude` CLI processes, builds arg arrays. Supports `cwd` parameter for isolated workspaces.
 - `impersonation.ts` — ImpersonationManager: symlinks skills, builds system prompt, cleanup traps
-- `template-loader.ts` — TemplateLoader: lists/loads/applies built-in templates
+- `template-loader.ts` — TemplateLoader: lists/loads/applies built-in and user-installed templates. Supports `install()` (from directory source), `createFromAgent()` (extract template from agent), `delete()` (remove user template). Merges built-in + user template directories in `list()`.
 - `claude-flags.ts` — Claude Code flag pass-through parser
 
-**Tests:** `tests/unit/config.test.ts`, `agent-manager.test.ts`, `skill-manager.test.ts`, `session-manager.test.ts`, `claude-bridge.test.ts`, `impersonation.test.ts`, `core-edge-cases.test.ts`
+**Tests:** `tests/unit/config.test.ts`, `agent-manager.test.ts`, `skill-manager.test.ts`, `session-manager.test.ts`, `claude-bridge.test.ts`, `impersonation.test.ts`, `core-edge-cases.test.ts`, `template-install-create.test.ts`
 
 ### `src/battle/` — Battle System
-- `engine.ts` — BattleEngine: creates configs, assembles results, validates modes
+- `engine.ts` — BattleEngine: creates configs, assembles results, validates modes. Runs agents in isolated temp directories (`/tmp/miyagi-battle-*`) with `--dangerously-skip-permissions` so agents can write and execute code. Persistent workspaces across rounds (agents build on their work). Collects generated files (up to 30KB) from the final workspace state and appends to the last round response. 10-minute timeout per agent call. Cleanup via `finally` blocks.
 - `mediator.ts` — BattleMediator: turn-by-turn asymmetric battles, role prompts, termination detection
 - `modes/` — 10 mode config files + `index.ts` registry
 
-**Tests:** `tests/unit/battle-engine.test.ts`, `battle-mediator.test.ts`, `battle-modes.test.ts`, `battle-edge-cases.test.ts`
+**Tests:** `tests/unit/battle-engine.test.ts`, `battle-mediator.test.ts`, `battle-modes.test.ts`, `battle-edge-cases.test.ts`, `battle-temp-dirs.test.ts`
 
 ### `src/training/` — Judge, Coach, Scoring
-- `judge.ts` — Judge: builds evaluation prompts, parses JudgeVerdict from LLM JSON
-- `coach.ts` — Coach (Mr. Miyagi): builds coaching prompts, parses coaching changes
-- `scoring.ts` — ELO calculator, dimensional scoring, trend detection
-- `history.ts` — HistoryManager: reads/writes stats.json, battles.json, training-log.md
+- `judge.ts` — Judge: builds evaluation prompts with task verification requirements, parses JudgeVerdict from LLM JSON. Uses "contestant" terminology to avoid role confusion. Instructs judge to verify actual generated files against agent claims. Retry logic (2 attempts).
+- `coach.ts` — Coach (Mr. Miyagi): builds coaching prompts with full battle transcript, agent identity, manifest (description, domains, templateOrigin). Prompt uses "student" framing to distinguish coached agent from coach. Retry logic (2 attempts). Transcript truncated to 3K per output to manage prompt size.
+- `scoring.ts` — ELO calculator (K=32, floor at 0), dimensional scoring, trend detection
+- `history.ts` — HistoryManager: reads/writes stats.json, battles.json, training-log.md. Also `saveBattleData()`/`getBattleData()` for persisting full BattleResult + JudgeVerdict to `reports/battle-data/<id>.json` with battleId sanitization.
 
-**Tests:** `tests/unit/judge.test.ts`, `coach.test.ts`, `scoring.test.ts`, `history.test.ts`, `training-edge-cases.test.ts`
+**Tests:** `tests/unit/judge.test.ts`, `coach.test.ts`, `scoring.test.ts`, `history.test.ts`, `training-edge-cases.test.ts`, `auto-coach.test.ts`, `battle-report-integration.test.ts`
 
 ### `src/cli/` — CLI Layer
 - `program.ts` — Commander.js program with all command registrations
-- `commands/` — 11 files, one per command group (agent, use, battle, train, stats, skill, export-import, templates, report, sessions, miyagi-help)
+- `commands/` — 11 files, one per command group:
+  - `agent.ts` — create, edit, delete, clone, list
+  - `battle.ts` — Battle two agents. After judge verdict: auto-coaches both agents with Mr. Miyagi (domain-specific, with battle transcript). Saves full battle data for report generation.
+  - `train.ts` — Manual Mr. Miyagi coaching session
+  - `templates.ts` — list, install (from directory, `--force`), create (from agent, `--from` or interactive), delete
+  - `report.ts` — Generate HTML reports: `--type profile` (agent stats) or `--type battle` (from saved battle data)
+  - `use.ts`, `stats.ts`, `skill.ts`, `export-import.ts`, `sessions.ts`, `miyagi-help.ts`
 - `display/stats-display.ts` — Terminal stats rendering (pure string formatting)
 - `middleware/security.ts` — Archive entry validation (path traversal, symlinks, size)
 
@@ -96,7 +102,9 @@ Each directory is an independent area. Agents working on one area should not nee
 
 ### `src/templates/` and `src/builtin-agents/` — Static Content
 - Templates: `salesman/`, `developer/`, `business-analyst/`, `writer/`, `support-rep/` (each has `manifest.json` + `identity.md`)
-- Builtin agents: `miyagi-judge/identity.md`, `mr-miyagi/identity.md`
+- Builtin agents:
+  - `miyagi-judge/identity.md` — Impartial battle arbiter with task verification, file-aware evaluation, domain-adaptive scoring
+  - `mr-miyagi/identity.md` — Master coach with critical/realistic tone, specialist-not-generalist philosophy, domain-specific coaching techniques (coding, sales, support, writing, BA)
 - These are markdown/JSON content files — no TypeScript
 
 ## Conventions
@@ -130,14 +138,6 @@ Each directory is an independent area. Agents working on one area should not nee
 3. Add to `BattleMode` union type in `src/types/battle.ts`
 4. Add to `VALID_MODES` and `DEFAULT_ROUNDS` in `src/battle/engine.ts`
 5. Verify via `tests/unit/battle-modes.test.ts`
-
-## Known Gaps
-
-See `docs/implementation-gaps.md` for 18 tracked issues with severity ratings and fix instructions. Critical items:
-- `skill.ts` install/update commands are stubs (GAP-1)
-- `use.ts` never records sessions (GAP-2)
-- No JSON.parse error handling (GAP-3)
-- Null assertions in `history.ts` (GAP-4)
 
 ## Dependencies
 

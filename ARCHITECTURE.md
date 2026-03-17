@@ -76,11 +76,11 @@ SessionManager                 ClaudeBridge            TemplateLoader
 **ClaudeBridge** — Spawns `claude` CLI processes. Builds argument arrays for:
 - Interactive sessions (`stdio: 'inherit'` — for `miyagi use`)
 - Non-interactive capture (`stdio: 'pipe'` — for battles and judging)
-Locates the `claude` binary via `which claude`.
+Locates the `claude` binary via `which claude`. Supports `cwd` parameter for spawning in isolated temp directories.
 
 **ImpersonationManager** — Activates an agent by symlinking its skills into Claude's commands directory with prefixed names (`miyagi-{agent}-{skill}`). Builds system prompts by concatenating `identity.md` + all `context/*.md` files. Registers SIGINT/SIGTERM/exit handlers for cleanup.
 
-**TemplateLoader** — Reads built-in templates from `src/templates/`. Lists available templates, loads manifest + identity content, and copies template files into new agent directories.
+**TemplateLoader** — Manages both built-in templates (from `src/templates/`) and user-installed templates (from `~/.miyagi/templates/`). Supports `list()` (merged from both dirs), `install()` (validate manifest + copy to user dir, with `--force`), `createFromAgent()` (extract template from existing agent), `delete()` (remove user template), `getTemplate()`, and `applyTemplate()`.
 
 **claude-flags.ts** — Defines all Claude Code CLI flags and a parser that separates miyagi-specific args from Claude pass-through args. Used by command handlers to forward flags like `--model`, `--effort`, `--worktree` to the underlying `claude` process.
 
@@ -107,7 +107,7 @@ BattleEngine                    BattleMediator
         └── sales-roleplay    (asymmetric, 10 rounds)
 ```
 
-**BattleEngine** — Creates `BattleConfig` objects with unique IDs, validates modes against the registry, and assembles final `BattleResult` objects from collected rounds.
+**BattleEngine** — Creates `BattleConfig` objects with unique IDs, validates modes against the registry, and assembles final `BattleResult` objects from collected rounds. Runs agents in persistent isolated temp directories (`/tmp/miyagi-battle-*`) with `--dangerously-skip-permissions` so agents can write and execute code. Workspaces persist across rounds so agents can build iteratively. Collects actual generated files (up to 30KB, blacklisting `node_modules`, lock files, etc.) from the final workspace and appends to the last round response for judge/coach evaluation. 10-minute timeout per agent call. Cleanup via `finally` blocks.
 
 **BattleMediator** — Handles turn-by-turn asymmetric battles. Builds role-specific prompts from `BattleModeConfig`, maintains conversation history, and detects natural termination signals (`[END_CONVERSATION]`, `[DEAL_CLOSED]`, etc.).
 
@@ -141,16 +141,18 @@ from mr-miyagi/     │           ├── battles.json   (battle log)
             context files)
 ```
 
-**Judge** — Takes a `BattleResult`, builds a structured evaluation prompt, sends it to Claude (via ClaudeBridge), and parses the response into a `JudgeVerdict` containing: winner, analysis per agent, dimension scores, and coaching priorities.
+**Judge** — Takes a `BattleResult`, builds a structured evaluation prompt using "contestant" terminology (to avoid role confusion), sends it to Claude (via ClaudeBridge), and parses the response into a `JudgeVerdict`. The judge verifies task completion against the original requirements and evaluates actual generated files (not just agent descriptions). Retry logic (2 attempts) handles JSON parse failures.
 
-**Coach (Mr. Miyagi)** — Takes a `JudgeVerdict` and the agent's current files, builds a coaching prompt, and produces a `CoachingResult` with specific file changes (add/modify/remove) to improve the agent.
+**Coach (Mr. Miyagi)** — Takes a `JudgeVerdict`, the agent's current identity, manifest (description, domains, templateOrigin), and the full battle transcript. Builds a coaching prompt using "student" framing and produces a `CoachingResult` with specific file changes. The Mr. Miyagi identity enforces critical/realistic tone (no empty praise), specialist focus (deepen expertise, don't generalize), and domain-specific techniques (design patterns for devs, SPIN/MEDDIC for sales, etc.). Retry logic (2 attempts). Transcript truncated to 3K per output.
+
+**Auto-coaching** — After every battle, coaching runs automatically for both agents via `battle.ts`. No need for manual `miyagi train` calls (though manual training is still available for standalone coaching sessions).
 
 **scoring.ts** — Pure functions:
 - `calculateElo(winnerRating, loserRating, outcome)` — Standard ELO with K=32
 - `updateDimensionScores(existing, newScores)` — Appends scores to history, recalculates trends
 - `determineTrend(history)` — Analyzes last 5 values for up/down/stable (0.2 threshold)
 
-**HistoryManager** — Persistence layer for training data. Reads/writes `stats.json` (AgentStats), appends to `battles.json`, updates battle records (W/L/D), dimensional scores, and training log.
+**HistoryManager** — Persistence layer for training data. Reads/writes `stats.json` (AgentStats), appends to `battles.json`, updates battle records (W/L/D), dimensional scores, and training log. Also persists full battle data (BattleResult + JudgeVerdict) to `reports/battle-data/<id>.json` via `saveBattleData()`/`getBattleData()` for report generation. Battle ID sanitization prevents path traversal.
 
 ### 5. Reports (`src/reports/`)
 
@@ -164,8 +166,8 @@ ReportGenerator
 ```
 
 Generates standalone HTML reports with inlined CSS. Dark theme (`#0d1117` background) with responsive grid layout. Two report types:
-- **Battle report** — Shows result, narrative, round transcripts, coaching priorities
-- **Profile report** — Shows battle record, ELO ratings, skill dimension bars
+- **Battle report** (`miyagi report <battle-id> --type battle`) — Shows result, narrative, round transcripts, coaching priorities. Reads from `reports/battle-data/<id>.json`.
+- **Profile report** (`miyagi report <agent> --type profile`) — Shows battle record, ELO ratings, skill dimension bars
 
 ### 6. Security (`src/cli/middleware/security.ts`, `src/utils/archive.ts`)
 
@@ -201,27 +203,35 @@ All modules import types from `../types/index.js`. Types are interfaces/type ali
          │
 3. Configure: BattleEngine.createConfig() → BattleConfig
          │
-4. Execute: For each round:
-         │   ├── BattleMediator.buildRolePrompts()
+4. Execute: Create persistent temp dirs per agent (/tmp/miyagi-battle-*)
+         │   For each round:
+         │   ├── BattleMediator.buildRolePrompts() (asymmetric only)
          │   ├── BattleMediator.buildTurnPrompt() with history
-         │   ├── ClaudeBridge.runAndCapture() for each agent
+         │   ├── ClaudeBridge.runAndCapture(cwd=tempDir, --dangerously-skip-permissions)
          │   ├── BattleMediator.isNaturalEnd() check
          │   └── Collect BattleRound
+         │   After last round:
+         │   ├── collectGeneratedFiles(tempDir) → append actual code to last round
+         │   └── Cleanup temp dirs (finally block)
          │
 5. Assemble: BattleEngine.assembleResult() → BattleResult
          │
-6. Judge: Judge.buildEvaluationPrompt(result)
-         │   └── ClaudeBridge.runAndCapture() → raw JSON
+6. Judge: Judge.buildEvaluationPrompt(result) with task verification
+         │   └── ClaudeBridge.runAndCapture() → raw JSON (retry 2x)
          │   └── Judge.parseVerdict() → JudgeVerdict
          │
 7. Record: HistoryManager.recordBattle() for both agents
          │   └── HistoryManager.updateStats() with scoring
+         │   └── HistoryManager.saveBattleData() for report generation
          │
-8. Coach: Coach.buildCoachingPrompt(verdict)
-         │   └── ClaudeBridge.runAndCapture() → CoachingResult
-         │   └── Apply changes to identity.md/context
+8. Auto-Coach: For each agent:
+         │   ├── Build transcript (student output + opponent output, truncated)
+         │   ├── Coach.buildCoachingPrompt(verdict, identity, manifest, transcript)
+         │   ├── ClaudeBridge.runAndCapture() → CoachingResult (retry 2x)
+         │   ├── Coach.applyChanges() → modify identity.md/context/skills
+         │   └── HistoryManager.appendTrainingLog() + addCoachNote()
          │
-9. Report: ReportGenerator.generateBattleReport() → HTML file
+9. Report: miyagi report <battle-id> --type battle → HTML file
 ```
 
 ## Data Flow: Agent Impersonation
@@ -263,8 +273,10 @@ All modules import types from `../types/index.js`. Types are interfaces/type ali
         stats.json                  # AgentStats (ELO, dimensions, record)
         battles.json                # Battle log entries
         training-log.md             # Coaching session notes
-  templates/                        # User-installed templates
+  templates/                        # User-installed templates (install/create/delete)
   reports/                          # Generated HTML reports
+    battle-data/                    # Full battle results + verdicts (JSON per battle ID)
+      {battle-id}.json              # { result: BattleResult, verdict: JudgeVerdict }
 
 {project}/.miyagi/agents/           # Project-scoped agents (shadows global)
 ```
@@ -276,7 +288,7 @@ tsup.config.ts
   entry: bin/miyagi.ts
   format: ESM
   target: node18
-  output: dist/bin/miyagi.js (single bundle, ~48KB)
+  output: dist/bin/miyagi.js (single bundle, ~95KB)
   banner: #!/usr/bin/env node
 ```
 
