@@ -28,12 +28,17 @@ export class ConfigManager {
     return join(this.rootDir, 'reports');
   }
 
+  get battlesDir(): string {
+    return join(this.rootDir, 'battles');
+  }
+
   ensureDirectories(): void {
     const dirs = [
       this.rootDir,
       this.agentsDir,
       this.templatesDir,
       this.reportsDir,
+      this.battlesDir,
     ];
     for (const dir of dirs) {
       if (!existsSync(dir)) {

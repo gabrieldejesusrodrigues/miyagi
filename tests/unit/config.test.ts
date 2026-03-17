@@ -37,4 +37,11 @@ describe('ConfigManager', () => {
     expect(fs.existsSync(join(tempDir, 'templates'))).toBe(true);
     expect(fs.existsSync(join(tempDir, 'reports'))).toBe(true);
   });
+
+  it('creates battles directory on ensureDirectories', () => {
+    configManager.ensureDirectories();
+    const fs = require('fs');
+    expect(fs.existsSync(join(tempDir, 'battles'))).toBe(true);
+    expect(configManager.battlesDir).toBe(join(tempDir, 'battles'));
+  });
 });
