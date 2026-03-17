@@ -45,3 +45,17 @@ export interface BattleResult {
   endedAt: string;
   terminationReason: 'natural' | 'round-limit' | 'user-stopped' | 'judge-called';
 }
+
+export type BattlePhase = 'setup' | 'round' | 'judge' | 'coach' | 'complete';
+
+export interface BattleProgressEvent {
+  phase: BattlePhase;
+  type: 'start' | 'complete' | 'info';
+  round?: number;
+  totalRounds?: number;
+  agent?: string;
+  message?: string;
+  elapsedMs?: number;
+}
+
+export type BattleProgressCallback = (event: BattleProgressEvent) => void;
