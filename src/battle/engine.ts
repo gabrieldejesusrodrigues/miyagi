@@ -135,38 +135,46 @@ export class BattleEngine {
 
     const rounds: BattleRound[] = [];
 
-    for (let round = 1; round <= config.maxRounds; round++) {
-      let taskPrompt: string;
-      if (round === 1) {
-        taskPrompt = config.task ?? config.topic ?? 'Complete the task.';
-      } else {
-        const prev = rounds[round - 2];
-        taskPrompt = `${config.task ?? config.topic ?? 'Complete the task.'}\n\n` +
-          `Previous round output:\n` +
-          `${config.agentA}: ${prev.agentAResponse}\n` +
-          `${config.agentB}: ${prev.agentBResponse}\n\n` +
-          `Continue and improve on the above.`;
-      }
+    // Persistent workspace per agent — files accumulate across rounds
+    const tempDirA = mkdtempSync(join(tmpdir(), 'miyagi-battle-'));
+    const tempDirB = mkdtempSync(join(tmpdir(), 'miyagi-battle-'));
 
-      const optsA = { systemPrompt: identityA, prompt: taskPrompt, effort, dangerouslySkipPermissions: true };
-      const optsB = { systemPrompt: identityB, prompt: taskPrompt, effort, dangerouslySkipPermissions: true };
-      const tempDirA = mkdtempSync(join(tmpdir(), 'miyagi-battle-'));
-      const tempDirB = mkdtempSync(join(tmpdir(), 'miyagi-battle-'));
+    try {
+      for (let round = 1; round <= config.maxRounds; round++) {
+        let taskPrompt: string;
+        if (round === 1) {
+          taskPrompt = config.task ?? config.topic ?? 'Complete the task.';
+        } else {
+          const prev = rounds[round - 2];
+          taskPrompt = `${config.task ?? config.topic ?? 'Complete the task.'}\n\n` +
+            `Previous round output:\n` +
+            `${config.agentA}: ${prev.agentAResponse}\n` +
+            `${config.agentB}: ${prev.agentBResponse}\n\n` +
+            `Continue and improve on the above.`;
+        }
 
-      try {
+        const optsA = { systemPrompt: identityA, prompt: taskPrompt, effort, dangerouslySkipPermissions: true };
+        const optsB = { systemPrompt: identityB, prompt: taskPrompt, effort, dangerouslySkipPermissions: true };
+
         const [rawResponseA, rawResponseB] = await Promise.all([
           bridge.runAndCapture(bridge.buildBattleArgs(optsA), 600_000, bridge.buildBattleStdin(optsA), tempDirA),
           bridge.runAndCapture(bridge.buildBattleArgs(optsB), 600_000, bridge.buildBattleStdin(optsB), tempDirB),
         ]);
-        // Only collect generated files on the LAST round to keep prompt size manageable
-        const isLastRound = round === config.maxRounds;
-        const agentAResponse = rawResponseA + (isLastRound ? collectGeneratedFiles(tempDirA) : '');
-        const agentBResponse = rawResponseB + (isLastRound ? collectGeneratedFiles(tempDirB) : '');
-        rounds.push({ round, agentAResponse, agentBResponse, timestamp: new Date().toISOString() });
-      } finally {
-        rmSync(tempDirA, { recursive: true, force: true });
-        rmSync(tempDirB, { recursive: true, force: true });
+
+        rounds.push({ round, agentAResponse: rawResponseA, agentBResponse: rawResponseB, timestamp: new Date().toISOString() });
       }
+
+      // Collect final state of generated files (cumulative across all rounds)
+      const filesA = collectGeneratedFiles(tempDirA);
+      const filesB = collectGeneratedFiles(tempDirB);
+      if (filesA || filesB) {
+        const lastRound = rounds[rounds.length - 1];
+        lastRound.agentAResponse += filesA;
+        lastRound.agentBResponse += filesB;
+      }
+    } finally {
+      rmSync(tempDirA, { recursive: true, force: true });
+      rmSync(tempDirB, { recursive: true, force: true });
     }
 
     return this.assembleResult(config, rounds, 'round-limit');
