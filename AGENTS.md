@@ -26,11 +26,11 @@ bin/miyagi.ts                    # Entry point -> src/cli/program.ts
 src/
   cli/
     program.ts                   # Commander.js root, registers all commands
-    commands/                    # 11 command files (agent, battle, use, etc.)
+    commands/                    # 12 command files (agent, battle, battle-status, use, etc.)
     display/                     # Terminal output formatters
     middleware/                   # Security validators for import/export
   core/                          # Stateless managers (config, agent, skill, session, etc.)
-  battle/                        # BattleEngine, BattleMediator, modes/
+  battle/                        # BattleEngine, BattleMediator, modes/, background, runner
   training/                      # Judge, Coach, scoring, history
   reports/                       # Handlebars HTML generator + templates + CSS
   templates/                     # 5 built-in agent templates (salesman, developer, etc.)
@@ -62,8 +62,10 @@ Each directory is an independent area. Agents working on one area should not nee
 - `engine.ts` — BattleEngine: creates configs, assembles results, validates modes. Runs agents in isolated temp directories (`/tmp/miyagi-battle-*`) with `--dangerously-skip-permissions` so agents can write and execute code. Persistent workspaces across rounds (agents build on their work). Collects generated files (up to 30KB) from the final workspace state and appends to the last round response. 10-minute timeout per agent call. Cleanup via `finally` blocks.
 - `mediator.ts` — BattleMediator: turn-by-turn asymmetric battles, role prompts, termination detection
 - `modes/` — 10 mode config files + `index.ts` registry
+- `background.ts` — Background battle launcher: `launchBackground()` spawns detached child process, `getBattleStatus()` detects status via PID liveness and file presence, `getBattleInfo()` and `listBattles()` for querying battle state from `~/.miyagi/battles/`
+- `runner.ts` — Background battle runner: `runBattleBackground()` reads config from disk, executes full pipeline (engine → judge → coach → save), writes progress.jsonl, result.json, verdict.json, cleans up PID file
 
-**Tests:** `tests/unit/battle-engine.test.ts`, `battle-mediator.test.ts`, `battle-modes.test.ts`, `battle-edge-cases.test.ts`, `battle-temp-dirs.test.ts`
+**Tests:** `tests/unit/battle-engine.test.ts`, `battle-mediator.test.ts`, `battle-modes.test.ts`, `battle-edge-cases.test.ts`, `battle-temp-dirs.test.ts`, `background-launcher.test.ts`, `battle-runner.test.ts`
 
 ### `src/training/` — Judge, Coach, Scoring
 - `judge.ts` — Judge: builds evaluation prompts with task verification requirements, parses JudgeVerdict from LLM JSON. Uses "contestant" terminology to avoid role confusion. Instructs judge to verify actual generated files against agent claims. Retry logic (2 attempts).
@@ -77,7 +79,8 @@ Each directory is an independent area. Agents working on one area should not nee
 - `program.ts` — Commander.js program with all command registrations
 - `commands/` — 11 files, one per command group:
   - `agent.ts` — create, edit, delete, clone, list
-  - `battle.ts` — Battle two agents. After judge verdict: auto-coaches both agents with Mr. Miyagi (domain-specific, with battle transcript). Saves full battle data for report generation.
+  - `battle.ts` — Battle two agents. Supports `--background` for detached execution. After judge verdict: auto-coaches both agents with Mr. Miyagi (domain-specific, with battle transcript). Saves full battle data for report generation.
+  - `battle-status.ts` — `miyagi battle status [id]` shows background battle progress; `miyagi battle list` shows recent battles in a table
   - `train.ts` — Manual Mr. Miyagi coaching session
   - `templates.ts` — list, install (from directory, `--force`), create (from agent, `--from` or interactive), delete
   - `report.ts` — Generate HTML reports: `--type profile` (agent stats) or `--type battle` (from saved battle data)
