@@ -47,7 +47,7 @@ function collectGeneratedFiles(dir: string, maxTotalSize = 30_000): string {
   return result;
 }
 import type {
-  BattleConfig, BattleMode, BattleRound, BattleResult,
+  BattleConfig, BattleMode, BattleRound, BattleResult, BattleProgressCallback,
 } from '../types/index.js';
 import type { AgentManager } from '../core/agent-manager.js';
 import type { ClaudeBridge } from '../core/claude-bridge.js';
@@ -124,6 +124,7 @@ export class BattleEngine {
     agentManager: AgentManager,
     bridge: ClaudeBridge,
     effort?: string,
+    onProgress?: BattleProgressCallback,
   ): Promise<BattleResult> {
     const agentA = await agentManager.get(config.agentA);
     const agentB = await agentManager.get(config.agentB);
@@ -141,6 +142,8 @@ export class BattleEngine {
 
     try {
       for (let round = 1; round <= config.maxRounds; round++) {
+        if (onProgress) onProgress({ phase: 'round', type: 'start', round, totalRounds: config.maxRounds });
+
         let taskPrompt: string;
         if (round === 1) {
           taskPrompt = config.task ?? config.topic ?? 'Complete the task.';
@@ -156,10 +159,17 @@ export class BattleEngine {
         const optsA = { systemPrompt: identityA, prompt: taskPrompt, effort, dangerouslySkipPermissions: true };
         const optsB = { systemPrompt: identityB, prompt: taskPrompt, effort, dangerouslySkipPermissions: true };
 
+        if (onProgress) onProgress({ phase: 'round', type: 'info', agent: config.agentA, round });
+        if (onProgress) onProgress({ phase: 'round', type: 'info', agent: config.agentB, round });
+
+        const startA = Date.now();
+        const startB = Date.now();
         const [rawResponseA, rawResponseB] = await Promise.all([
           bridge.runAndCapture(bridge.buildBattleArgs(optsA), 600_000, bridge.buildBattleStdin(optsA), tempDirA),
           bridge.runAndCapture(bridge.buildBattleArgs(optsB), 600_000, bridge.buildBattleStdin(optsB), tempDirB),
         ]);
+        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentA, round, elapsedMs: Date.now() - startA });
+        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentB, round, elapsedMs: Date.now() - startB });
 
         rounds.push({ round, agentAResponse: rawResponseA, agentBResponse: rawResponseB, timestamp: new Date().toISOString() });
       }
@@ -185,6 +195,7 @@ export class BattleEngine {
     agentManager: AgentManager,
     bridge: ClaudeBridge,
     effort?: string,
+    onProgress?: BattleProgressCallback,
   ): Promise<BattleResult> {
     const agentA = await agentManager.get(config.agentA);
     const agentB = await agentManager.get(config.agentB);
@@ -207,11 +218,16 @@ export class BattleEngine {
 
     try {
       for (let round = 1; round <= config.maxRounds; round++) {
+        if (onProgress) onProgress({ phase: 'round', type: 'start', round, totalRounds: config.maxRounds });
+
         const turnPromptA = mediator.buildTurnPrompt(rolePrompts.agentA, history, round, config.maxRounds);
         const optsA = { systemPrompt: identityA, prompt: turnPromptA, effort, dangerouslySkipPermissions: true };
+        if (onProgress) onProgress({ phase: 'round', type: 'info', agent: config.agentA, round });
+        const startA = Date.now();
         const rawResponseA = await bridge.runAndCapture(
           bridge.buildBattleArgs(optsA), undefined, bridge.buildBattleStdin(optsA), tempDirA,
         );
+        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentA, round, elapsedMs: Date.now() - startA });
         const responseA = rawResponseA + collectGeneratedFiles(tempDirA);
         history.push({ role: config.agentA, content: responseA });
 
@@ -223,9 +239,12 @@ export class BattleEngine {
 
         const turnPromptB = mediator.buildTurnPrompt(rolePrompts.agentB, history, round, config.maxRounds);
         const asymOptsB = { systemPrompt: identityB, prompt: turnPromptB, effort, dangerouslySkipPermissions: true };
+        if (onProgress) onProgress({ phase: 'round', type: 'info', agent: config.agentB, round });
+        const startB = Date.now();
         const rawResponseB = await bridge.runAndCapture(
           bridge.buildBattleArgs(asymOptsB), undefined, bridge.buildBattleStdin(asymOptsB), tempDirB,
         );
+        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentB, round, elapsedMs: Date.now() - startB });
         const responseB = rawResponseB + collectGeneratedFiles(tempDirB);
         history.push({ role: config.agentB, content: responseB });
 
