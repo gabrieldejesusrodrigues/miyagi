@@ -84,16 +84,17 @@ export class ClaudeBridge {
     });
   }
 
-  spawnNonInteractive(args: string[]): ChildProcess {
+  spawnNonInteractive(args: string[], cwd?: string): ChildProcess {
     return spawn(this.claudePath, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env },
+      ...(cwd ? { cwd } : {}),
     });
   }
 
-  async runAndCapture(args: string[], timeout: number = 300_000, stdinData?: string): Promise<string> {
+  async runAndCapture(args: string[], timeout: number = 300_000, stdinData?: string, cwd?: string): Promise<string> {
     return new Promise((resolve, reject) => {
-      const child = this.spawnNonInteractive(args);
+      const child = this.spawnNonInteractive(args, cwd);
       let stdout = '';
       let stderr = '';
       let killed = false;

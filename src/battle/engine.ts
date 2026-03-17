@@ -1,5 +1,7 @@
 import { randomUUID } from 'crypto';
-import { readFileSync } from 'fs';
+import { readFileSync, mkdtempSync, rmSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 import type {
   BattleConfig, BattleMode, BattleRound, BattleResult,
 } from '../types/index.js';
@@ -102,15 +104,21 @@ export class BattleEngine {
           `Continue and improve on the above.`;
       }
 
-      const optsA = { systemPrompt: identityA, prompt: taskPrompt, effort };
-      const optsB = { systemPrompt: identityB, prompt: taskPrompt, effort };
+      const optsA = { systemPrompt: identityA, prompt: taskPrompt, effort, dangerouslySkipPermissions: true };
+      const optsB = { systemPrompt: identityB, prompt: taskPrompt, effort, dangerouslySkipPermissions: true };
+      const tempDirA = mkdtempSync(join(tmpdir(), 'miyagi-battle-'));
+      const tempDirB = mkdtempSync(join(tmpdir(), 'miyagi-battle-'));
 
-      const [agentAResponse, agentBResponse] = await Promise.all([
-        bridge.runAndCapture(bridge.buildBattleArgs(optsA), undefined, bridge.buildBattleStdin(optsA)),
-        bridge.runAndCapture(bridge.buildBattleArgs(optsB), undefined, bridge.buildBattleStdin(optsB)),
-      ]);
-
-      rounds.push({ round, agentAResponse, agentBResponse, timestamp: new Date().toISOString() });
+      try {
+        const [agentAResponse, agentBResponse] = await Promise.all([
+          bridge.runAndCapture(bridge.buildBattleArgs(optsA), undefined, bridge.buildBattleStdin(optsA), tempDirA),
+          bridge.runAndCapture(bridge.buildBattleArgs(optsB), undefined, bridge.buildBattleStdin(optsB), tempDirB),
+        ]);
+        rounds.push({ round, agentAResponse, agentBResponse, timestamp: new Date().toISOString() });
+      } finally {
+        rmSync(tempDirA, { recursive: true, force: true });
+        rmSync(tempDirB, { recursive: true, force: true });
+      }
     }
 
     return this.assembleResult(config, rounds, 'round-limit');
@@ -138,33 +146,41 @@ export class BattleEngine {
     const rounds: BattleRound[] = [];
     let terminationReason: BattleResult['terminationReason'] = 'round-limit';
 
-    for (let round = 1; round <= config.maxRounds; round++) {
-      const turnPromptA = mediator.buildTurnPrompt(rolePrompts.agentA, history, round, config.maxRounds);
-      const optsA = { systemPrompt: identityA, prompt: turnPromptA, effort };
-      const responseA = await bridge.runAndCapture(
-        bridge.buildBattleArgs(optsA), undefined, bridge.buildBattleStdin(optsA),
-      );
-      history.push({ role: config.agentA, content: responseA });
+    const tempDirA = mkdtempSync(join(tmpdir(), 'miyagi-battle-'));
+    const tempDirB = mkdtempSync(join(tmpdir(), 'miyagi-battle-'));
 
-      if (mediator.isNaturalEnd(responseA)) {
-        rounds.push({ round, agentAResponse: responseA, agentBResponse: '', timestamp: new Date().toISOString() });
-        terminationReason = 'natural';
-        break;
+    try {
+      for (let round = 1; round <= config.maxRounds; round++) {
+        const turnPromptA = mediator.buildTurnPrompt(rolePrompts.agentA, history, round, config.maxRounds);
+        const optsA = { systemPrompt: identityA, prompt: turnPromptA, effort, dangerouslySkipPermissions: true };
+        const responseA = await bridge.runAndCapture(
+          bridge.buildBattleArgs(optsA), undefined, bridge.buildBattleStdin(optsA), tempDirA,
+        );
+        history.push({ role: config.agentA, content: responseA });
+
+        if (mediator.isNaturalEnd(responseA)) {
+          rounds.push({ round, agentAResponse: responseA, agentBResponse: '', timestamp: new Date().toISOString() });
+          terminationReason = 'natural';
+          break;
+        }
+
+        const turnPromptB = mediator.buildTurnPrompt(rolePrompts.agentB, history, round, config.maxRounds);
+        const asymOptsB = { systemPrompt: identityB, prompt: turnPromptB, effort, dangerouslySkipPermissions: true };
+        const responseB = await bridge.runAndCapture(
+          bridge.buildBattleArgs(asymOptsB), undefined, bridge.buildBattleStdin(asymOptsB), tempDirB,
+        );
+        history.push({ role: config.agentB, content: responseB });
+
+        rounds.push({ round, agentAResponse: responseA, agentBResponse: responseB, timestamp: new Date().toISOString() });
+
+        if (mediator.isNaturalEnd(responseB)) {
+          terminationReason = 'natural';
+          break;
+        }
       }
-
-      const turnPromptB = mediator.buildTurnPrompt(rolePrompts.agentB, history, round, config.maxRounds);
-      const asymOptsB = { systemPrompt: identityB, prompt: turnPromptB, effort };
-      const responseB = await bridge.runAndCapture(
-        bridge.buildBattleArgs(asymOptsB), undefined, bridge.buildBattleStdin(asymOptsB),
-      );
-      history.push({ role: config.agentB, content: responseB });
-
-      rounds.push({ round, agentAResponse: responseA, agentBResponse: responseB, timestamp: new Date().toISOString() });
-
-      if (mediator.isNaturalEnd(responseB)) {
-        terminationReason = 'natural';
-        break;
-      }
+    } finally {
+      rmSync(tempDirA, { recursive: true, force: true });
+      rmSync(tempDirB, { recursive: true, force: true });
     }
 
     return this.assembleResult(config, rounds, terminationReason);

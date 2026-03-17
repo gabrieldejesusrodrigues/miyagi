@@ -6,6 +6,7 @@ import { getModeConfig } from '../../battle/modes/index.js';
 import { ClaudeBridge } from '../../core/claude-bridge.js';
 import { Judge } from '../../training/judge.js';
 import { HistoryManager } from '../../training/history.js';
+import { Coach } from '../../training/coach.js';
 import type { BattleMode, JudgeVerdict } from '../../types/index.js';
 
 export function registerBattleCommand(program: Command): void {
@@ -133,6 +134,39 @@ export function registerBattleCommand(program: Command): void {
 
         // Save full battle data for report generation
         history.saveBattleData(config.reportsDir, battleConfig.id, result, verdict);
+
+        // Auto-train both agents
+        console.log('\nRunning Mr. Miyagi coaching for both agents...');
+        const coach = new Coach(agentManager);
+
+        for (const trainAgent of [agent1, agent2]) {
+          try {
+            console.log(`\nCoaching ${trainAgent}...`);
+            const agentFiles = await coach.getAgentFiles(trainAgent);
+            const agentObj = await agentManager.get(trainAgent);
+            const coachIdentity = coach.getIdentity();
+
+            const coachingPrompt = coach.buildCoachingPrompt(trainAgent, verdict, agentFiles.identity, agentObj!.manifest);
+            const coachOpts = {
+              systemPrompt: coachIdentity,
+              prompt: coachingPrompt,
+              effort: ['high', 'max'].includes(effort) ? effort : 'medium',
+            };
+
+            const rawResponse = await bridge.runAndCapture(
+              bridge.buildBattleArgs(coachOpts), 600_000, bridge.buildBattleStdin(coachOpts),
+            );
+            const coachingResult = coach.parseCoachingResponse(rawResponse);
+            await coach.applyChanges(trainAgent, coachingResult);
+            await history.appendTrainingLog(trainAgent, `Auto-coach after battle ${battleConfig.id}: ${coachingResult.summary}`);
+            await history.addCoachNote(trainAgent, coachingResult.summary);
+
+            console.log(`  ${trainAgent}: ${coachingResult.changes.length} changes applied`);
+            console.log(`  Summary: ${coachingResult.summary.slice(0, 150)}...`);
+          } catch (trainErr) {
+            console.error(`  Warning: Coaching failed for ${trainAgent}: ${trainErr instanceof Error ? trainErr.message : String(trainErr)}`);
+          }
+        }
 
         console.log(`\nBattle ID: ${battleConfig.id}`);
       } catch (err) {
