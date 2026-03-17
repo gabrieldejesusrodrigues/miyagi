@@ -24,7 +24,7 @@ These five dimensions apply to ALL battle modes. Rate each on a 1–10 scale wit
 
 | Dimension | What to Evaluate | 1–3 (Poor) | 4–6 (Adequate) | 7–8 (Strong) | 9–10 (Exceptional) |
 |-----------|------------------|------------|-----------------|---------------|---------------------|
-| **Task Completion** | Did the agent achieve the stated objective? | Failed to address the core task | Partially completed with gaps | Completed with minor issues | Fully achieved with extras |
+| **Task Completion** | Did the agent actually fulfill ALL requirements stated in the original task? Verify each requirement individually. An agent that produces elegant code but misses a requirement scores lower than one that covers all requirements with less polish. | Failed to address the core task or missed most requirements | Partially completed — some requirements met, others missing | All stated requirements met with minor gaps | All requirements fully met with thoughtful extras |
 | **Quality of Output** | Craftsmanship, depth, accuracy, polish | Superficial or incorrect | Functional but unremarkable | Well-crafted, few flaws | Outstanding, insightful, polished |
 | **Strategy & Approach** | Method effectiveness, structure, planning | No clear strategy visible | Basic approach, predictable | Thoughtful strategy, well-executed | Masterful approach, creative and effective |
 | **Adaptability** | Response to challenges, pivots, recovery | Rigid, ignores new information | Slow to adapt but eventually does | Adapts well, adjusts approach | Anticipates and adapts proactively |
@@ -52,13 +52,15 @@ Apply these additional criteria based on the battle mode:
 
 Follow this sequence for every battle:
 
-1. **Read the full transcript** before forming any opinion. First impressions can mislead.
-2. **Identify the battle mode** and activate the appropriate evaluation lens.
-3. **Map key moments** — turning points, strong moves, mistakes, missed opportunities.
-4. **Score each dimension independently** for each agent. Don't let a strong performance in one dimension inflate others.
-5. **Compare head-to-head** — where did one agent clearly outperform the other?
-6. **Determine the winner** based on the weight of evidence across all dimensions.
-7. **Formulate coaching priorities** — the 2–3 most impactful changes each agent could make.
+1. **Read the original task requirements carefully.** Before reading any agent output, break the task into a checklist of specific requirements. For example, if the task says "Implement LRU Cache with get, put, and capacity limit" your checklist is: (a) get method exists and works, (b) put method exists and works, (c) capacity limit is enforced, (d) LRU eviction order is correct.
+2. **Read the full transcript** before forming any opinion. First impressions can mislead.
+3. **Verify task completion against your checklist.** For EACH agent, check whether they actually fulfilled each requirement from step 1. An agent that talks about solving the task but doesn't show working code or a complete solution has NOT completed the task. Do not give credit for descriptions of what they would do — only for what they actually delivered.
+4. **Identify the battle mode** and activate the appropriate evaluation lens.
+5. **Map key moments** — turning points, strong moves, mistakes, missed opportunities.
+6. **Score each dimension independently** for each agent. Don't let a strong performance in one dimension inflate others.
+7. **Compare head-to-head** — where did one agent clearly outperform the other?
+8. **Determine the winner** based on the weight of evidence across all dimensions.
+9. **Formulate coaching priorities** — the 2–3 most impactful changes each agent could make.
 
 ### Handling Edge Cases
 

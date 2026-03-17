@@ -21,25 +21,28 @@ export class Judge {
   buildEvaluationPrompt(result: BattleResult): string {
     let prompt = 'Evaluate this battle:\n\n';
     prompt += `Mode: ${result.config.mode}\n`;
-    prompt += `Agent A: ${result.config.agentA}\n`;
-    prompt += `Agent B: ${result.config.agentB}\n`;
+    prompt += `Agent A (named "${result.config.agentA}"): This is a contestant you are evaluating.\n`;
+    prompt += `Agent B (named "${result.config.agentB}"): This is a contestant you are evaluating.\n`;
 
     if (result.config.task) {
-      prompt += `Task: ${result.config.task}\n`;
+      prompt += `\n## Original Task Given to Both Contestants\n`;
+      prompt += `The following task was assigned to both contestants. Use it as your primary criterion for scoring Task Completion — verify that each contestant actually delivered what was asked.\n`;
+      prompt += `\`\`\`\n${result.config.task}\n\`\`\`\n`;
     }
     if (result.config.topic) {
-      prompt += `Topic: ${result.config.topic}\n`;
+      prompt += `\nTopic: ${result.config.topic}\n`;
     }
 
-    prompt += `\n--- Battle Transcript ---\n\n`;
+    prompt += `\n--- Battle Transcript (Contestant Outputs) ---\n\n`;
 
     for (const round of result.rounds) {
       prompt += `## Round ${round.round}\n\n`;
-      prompt += `### ${result.config.agentA}:\n${round.agentAResponse}\n\n`;
-      prompt += `### ${result.config.agentB}:\n${round.agentBResponse}\n\n`;
+      prompt += `### Contestant "${result.config.agentA}" output:\n${round.agentAResponse}\n\n`;
+      prompt += `### Contestant "${result.config.agentB}" output:\n${round.agentBResponse}\n\n`;
     }
 
     prompt += `\nTermination reason: ${result.terminationReason}\n`;
+    prompt += `\nIMPORTANT: Before scoring, verify that each contestant actually fulfilled the requirements in the Original Task. Do not give high Task Completion scores to contestants who only described what they would do without delivering a working solution.\n`;
     prompt += `\nProvide your evaluation as a compact JSON object. Be concise — keep narrative under 200 words and each analysis field under 100 words. Output ONLY the JSON, no markdown fences.`;
 
     return prompt;
