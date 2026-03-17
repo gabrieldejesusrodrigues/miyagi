@@ -193,7 +193,7 @@ export function registerBattleCommand(program: Command): void {
 
             onProgress({ phase: 'coach', type: 'complete', agent: trainAgent, elapsedMs: Date.now() - coachStart });
             console.log(`    ${coachingResult!.changes.length} changes applied`);
-            console.log(`    Summary: ${coachingResult!.summary.slice(0, 150)}...`);
+            console.log(`    Summary: ${coachingResult!.summary}`);
           } catch (trainErr) {
             console.error(`  Warning: Coaching failed for ${trainAgent}: ${trainErr instanceof Error ? trainErr.message : String(trainErr)}`);
           }
