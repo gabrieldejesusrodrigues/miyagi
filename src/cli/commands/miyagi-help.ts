@@ -1,16 +1,3 @@
-import { CLAUDE_FLAGS } from '../../core/claude-flags.js';
-
-const MIYAGI_COMMANDS = [
-  { cmd: '/miyagi:help', desc: 'Show this help' },
-  { cmd: '/miyagi:skills', desc: "List this agent's skills" },
-  { cmd: '/miyagi:battle', desc: 'Challenge another agent' },
-  { cmd: '/miyagi:train', desc: 'Trigger coaching analysis' },
-  { cmd: '/miyagi:stats', desc: 'Show agent stats inline' },
-  { cmd: '/miyagi:switch', desc: 'Switch to a different agent' },
-  { cmd: '/miyagi:context', desc: 'Show loaded context files' },
-  { cmd: '/miyagi:identity', desc: 'Show current agent identity summary' },
-] as const;
-
 const CLAUDE_FLAG_DESCRIPTIONS: Array<{ flag: string; desc: string }> = [
   { flag: '--model <model>', desc: 'Model for the session (sonnet, opus, etc.)' },
   { flag: '--effort <level>', desc: 'Effort level (low, medium, high, max)' },
@@ -68,32 +55,3 @@ export function formatTerminalHelp(): string {
   return lines.join('\n');
 }
 
-export function formatInSessionHelp(agentName: string, agentSkills: string[]): string {
-  const lines: string[] = [];
-
-  lines.push('');
-  lines.push('  Miyagi In-Session Commands');
-  lines.push('  ===');
-  lines.push('');
-  lines.push('  Commands:');
-
-  const maxLen = Math.max(...MIYAGI_COMMANDS.map(c => c.cmd.length));
-  for (const { cmd, desc } of MIYAGI_COMMANDS) {
-    lines.push(`    ${cmd.padEnd(maxLen + 2)} ${desc}`);
-  }
-
-  lines.push('');
-  lines.push(`  Active Agent: ${agentName}`);
-
-  if (agentSkills.length > 0) {
-    lines.push(`  Agent Skills: ${agentSkills.map(s => '/' + s).join(', ')}`);
-  } else {
-    lines.push('  Agent Skills: (none installed)');
-  }
-
-  lines.push('');
-  lines.push('  Claude Code commands (/help, /rewind, /clear, etc.) work as normal.');
-  lines.push('');
-
-  return lines.join('\n');
-}
