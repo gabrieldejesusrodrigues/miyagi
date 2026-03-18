@@ -102,7 +102,10 @@ When you `use` an agent, Miyagi injects the agent's identity, context files, and
 | `miyagi battle <a> <b>` | Battle two agents (defaults to `same-task` mode) |
 | `miyagi battle <a> <b> --mode debate --topic "tabs vs spaces"` | Battle with a specific mode and topic |
 | `miyagi battle <a> <b> --effort low` | Battle with a specific effort level (low, medium, high, max) |
-| `miyagi battle <a> <b> --background` | Run battle in background |
+| `miyagi battle <a> <b> --background` | Run battle in background (returns immediately) |
+| `miyagi battle status <id>` | Check progress of a background battle |
+| `miyagi battle status` | List all recent background battles with status |
+| `miyagi battle list` | List recent background battles (alias) |
 
 ### Training & Stats
 

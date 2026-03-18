@@ -33,7 +33,8 @@ bin/miyagi.ts
   └── src/cli/program.ts          # Creates Commander.js program
         ├── commands/agent.ts      # create, edit, delete, clone, list
         ├── commands/use.ts        # Start Claude session as agent
-        ├── commands/battle.ts     # Battle two agents
+        ├── commands/battle.ts     # Battle two agents (foreground + background)
+        ├── commands/battle-status.ts  # battle status, battle list subcommands
         ├── commands/train.ts      # Mr. Miyagi coaching
         ├── commands/stats.ts      # Terminal stats display
         ├── commands/skill.ts      # install, update skills
@@ -41,7 +42,8 @@ bin/miyagi.ts
         ├── commands/templates.ts
         ├── commands/report.ts
         ├── commands/sessions.ts
-        └── commands/miyagi-help.ts
+        ├── commands/miyagi-help.ts
+        └── __run-battle (hidden)  # Background battle runner entry point
 ```
 
 `program.ts` imports 10 register functions, each of which adds commands to the Commander program. Command handlers instantiate core modules (ConfigManager, AgentManager, etc.) and delegate to them. The CLI layer has no business logic — it is pure routing and user I/O.
@@ -63,7 +65,7 @@ SessionManager                 ClaudeBridge            TemplateLoader
 (standalone)                  (standalone)             (standalone)
 ```
 
-**ConfigManager** — Root of the dependency tree. Manages `~/.miyagi/` directory structure and `config.json`. All other managers receive it as a constructor parameter.
+**ConfigManager** — Root of the dependency tree. Manages `~/.miyagi/` directory structure and `config.json`. All other managers receive it as a constructor parameter. Exposes `agentsDir`, `templatesDir`, `reportsDir`, and `battlesDir` getters.
 
 **AgentManager** — CRUD for agents. Creates directory structure (`manifest.json`, `identity.md`, `context/`, `skills/`, `history/`). Supports two scopes:
 - Global: `~/.miyagi/agents/{name}/`
@@ -94,7 +96,7 @@ BattleEngine                    BattleMediator
   ├── assembleResult()             ├── isNaturalEnd()
   │                                └── buildTurnPrompt()
   │
-  └── modes/index.ts  ◄── 10 mode config files
+  ├── modes/index.ts  ◄── 10 mode config files
         ├── same-task         (symmetric, 1 round)
         ├── code-challenge    (symmetric, 1 round)
         ├── speed-run         (symmetric, 1 round)
@@ -105,6 +107,13 @@ BattleEngine                    BattleMediator
         ├── interview         (asymmetric, 6 rounds)
         ├── negotiation       (asymmetric, 8 rounds)
         └── sales-roleplay    (asymmetric, 10 rounds)
+
+background.ts                  runner.ts
+  │                                │
+  ├── launchBackground()           └── runBattleBackground()
+  ├── getBattleStatus()                (full pipeline from disk:
+  ├── getBattleInfo()                   engine → judge → coach → save)
+  └── listBattles()
 ```
 
 **BattleEngine** — Creates `BattleConfig` objects with unique IDs, validates modes against the registry, and assembles final `BattleResult` objects from collected rounds. Runs agents in persistent isolated temp directories (`/tmp/miyagi-battle-*`) with `--dangerously-skip-permissions` so agents can write and execute code. Workspaces persist across rounds so agents can build iteratively. Collects actual generated files (up to 30KB, blacklisting `node_modules`, lock files, etc.) from the final workspace and appends to the last round response for judge/coach evaluation. 10-minute timeout per agent call. Cleanup via `finally` blocks.
@@ -112,6 +121,10 @@ BattleEngine                    BattleMediator
 **BattleMediator** — Handles turn-by-turn asymmetric battles. Builds role-specific prompts from `BattleModeConfig`, maintains conversation history, and detects natural termination signals (`[END_CONVERSATION]`, `[DEAL_CLOSED]`, etc.).
 
 **Battle Modes** — Each mode is a `BattleModeConfig` object defining: name, type (symmetric/asymmetric), description, default rounds, and optional role names. The `modes/index.ts` registry provides lookup and listing.
+
+**background.ts** — Manages background battle lifecycle. `launchBackground()` serializes `BattleConfig` + effort to `~/.miyagi/battles/<id>/config.json`, spawns a detached child process (`miyagi __run-battle <id>`), writes PID file, and calls `unref()` so the parent can exit. `getBattleStatus()` detects status via file presence (result.json → completed, error.txt → failed) and PID liveness (`process.kill(pid, 0)`). `getBattleInfo()` and `listBattles()` read battle directories and return typed `BackgroundBattleInfo` objects.
+
+**runner.ts** — Standalone battle execution from disk. `runBattleBackground()` reads a serialized config, runs the full pipeline (engine → judge → coach → save), writes progress events to `progress.jsonl`, saves `result.json` and `verdict.json` on success, writes `error.txt` on failure, and cleans up the PID file in a `finally` block.
 
 **Symmetric vs Asymmetric:**
 - Symmetric: Both agents receive the same task independently. Judge compares outputs.
@@ -187,7 +200,8 @@ All types are defined in `src/types/` and re-exported through `index.ts`:
 agent.ts    ── AgentManifest, Agent, InstalledSkillEntry
 skill.ts    ── SkillMetadata, AgentSkill
 battle.ts   ── BattleType, BattleMode (10 literals), BattleModeConfig,
-               BattleConfig, BattleRound, BattleResult
+               BattleConfig, BattleRound, BattleResult,
+               BattleStatus, BackgroundBattleConfig, BackgroundBattleInfo
 scoring.ts  ── DimensionScore, AgentStats, JudgeVerdict, AgentAnalysis
 config.ts   ── MiyagiConfig, SessionEntry
 ```
@@ -234,6 +248,37 @@ All modules import types from `../types/index.js`. Types are interfaces/type ali
 9. Report: miyagi report <battle-id> --type battle → HTML file
 ```
 
+## Data Flow: Background Battle
+
+```
+1. CLI: miyagi battle agentA agentB --background
+         │
+2. Validate: AgentManager.get() both agents exist
+         │
+3. Configure: BattleEngine.createConfig() → BattleConfig
+         │
+4. Launch: launchBackground()
+         │   ├── Write config.json to ~/.miyagi/battles/<id>/
+         │   ├── Spawn detached: miyagi __run-battle <id>
+         │   ├── Write PID file
+         │   ├── child.unref() → parent exits immediately
+         │   └── Print battle ID + PID to terminal
+         │
+5. Runner (detached process): runBattleBackground()
+         │   ├── Read config from battles/<id>/config.json
+         │   ├── Execute full pipeline (steps 4-8 above)
+         │   ├── Write progress events to progress.jsonl
+         │   ├── Write result.json + verdict.json on success
+         │   ├── Write error.txt on failure
+         │   └── Remove PID file (finally block)
+         │
+6. Status: miyagi battle status <id>
+         │   ├── PID file + process alive → "running"
+         │   ├── result.json exists → "completed" (show verdict)
+         │   ├── error.txt exists → "failed" (show error)
+         │   └── No PID → "pending"
+```
+
 ## Data Flow: Agent Impersonation
 
 ```
@@ -274,6 +319,14 @@ All modules import types from `../types/index.js`. Types are interfaces/type ali
         battles.json                # Battle log entries
         training-log.md             # Coaching session notes
   templates/                        # User-installed templates (install/create/delete)
+  battles/                          # Background battle storage
+    {battle-id}/
+      config.json                   # { battleConfig: BattleConfig, effort: string }
+      pid                           # Process ID (removed on completion)
+      progress.jsonl                # BattleProgressEvent stream (one JSON per line)
+      result.json                   # BattleResult (on success)
+      verdict.json                  # JudgeVerdict (on success)
+      error.txt                     # Error message (on failure)
   reports/                          # Generated HTML reports
     battle-data/                    # Full battle results + verdicts (JSON per battle ID)
       {battle-id}.json              # { result: BattleResult, verdict: JudgeVerdict }
@@ -288,7 +341,7 @@ tsup.config.ts
   entry: bin/miyagi.ts
   format: ESM
   target: node18
-  output: dist/bin/miyagi.js (single bundle, ~95KB)
+  output: dist/bin/miyagi.js (single bundle, ~113KB)
   banner: #!/usr/bin/env node
 ```
 

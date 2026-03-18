@@ -59,3 +59,21 @@ export interface BattleProgressEvent {
 }
 
 export type BattleProgressCallback = (event: BattleProgressEvent) => void;
+
+export type BattleStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface BackgroundBattleConfig {
+  battleConfig: BattleConfig;
+  effort: string;
+}
+
+export interface BackgroundBattleInfo {
+  id: string;
+  status: BattleStatus;
+  config: BattleConfig;
+  effort: string;
+  pid?: number;
+  startedAt: string;
+  completedAt?: string;
+  error?: string;
+}

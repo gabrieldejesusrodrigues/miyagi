@@ -9,9 +9,11 @@ import { HistoryManager } from '../../training/history.js';
 import { Coach } from '../../training/coach.js';
 import type { BattleMode, JudgeVerdict, BattleProgressCallback } from '../../types/index.js';
 import { createProgressCallback } from '../display/battle-display.js';
+import { launchBackground } from '../../battle/background.js';
+import { registerBattleStatusCommand } from './battle-status.js';
 
 export function registerBattleCommand(program: Command): void {
-  program
+  const battleCmd = program
     .command('battle')
     .argument('[agent1]', 'First agent')
     .argument('[agent2]', 'Second agent')
@@ -38,6 +40,24 @@ export function registerBattleCommand(program: Command): void {
       const agentB = await agentManager.get(agent2);
       if (!agentA) { console.error(`Agent "${agent1}" not found`); process.exit(1); }
       if (!agentB) { console.error(`Agent "${agent2}" not found`); process.exit(1); }
+
+      // Background mode — launch detached and return immediately
+      if (options.background) {
+        const mode = options.mode as BattleMode;
+        engine.validateMode(mode);
+        const modeConfig = getModeConfig(mode);
+        const battleConfig = engine.createConfig({
+          agentA: agent1, agentB: agent2, mode,
+          task: options.task, topic: options.topic,
+          maxRounds: options.rounds ?? modeConfig.defaultRounds,
+          background: true,
+        });
+        const { battleId, pid } = await launchBackground(battleConfig, options.effort || 'medium', config);
+        console.log(`Battle launched in background: ${battleId}`);
+        console.log(`PID: ${pid}`);
+        console.log(`Run \`miyagi battle status ${battleId}\` to check progress`);
+        return;
+      }
 
       try {
         // Validate mode
@@ -207,4 +227,7 @@ export function registerBattleCommand(program: Command): void {
         process.exit(1);
       }
     });
+
+  // Register subcommands
+  registerBattleStatusCommand(battleCmd);
 }
