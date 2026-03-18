@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatTerminalHelp, formatInSessionHelp } from '../../src/cli/commands/miyagi-help.js';
+import { formatTerminalHelp } from '../../src/cli/commands/miyagi-help.js';
 
 describe('miyagi --help (terminal)', () => {
   it('shows miyagi commands', () => {
@@ -26,37 +26,9 @@ describe('miyagi --help (terminal)', () => {
     const claudeIdx = output.indexOf('Claude Code Options');
     expect(miyagiIdx).toBeLessThan(claudeIdx);
   });
-});
 
-describe('/miyagi:help (in-session)', () => {
-  it('lists all miyagi in-session commands', () => {
-    const output = formatInSessionHelp('sales-agent', [
-      'discovery', 'objection-handling', 'closing-techniques',
-    ]);
-    expect(output).toContain('/miyagi:help');
-    expect(output).toContain('/miyagi:skills');
-    expect(output).toContain('/miyagi:battle');
-    expect(output).toContain('/miyagi:train');
-    expect(output).toContain('/miyagi:stats');
-    expect(output).toContain('/miyagi:switch');
-    expect(output).toContain('/miyagi:context');
-    expect(output).toContain('/miyagi:identity');
-  });
-
-  it('shows active agent name', () => {
-    const output = formatInSessionHelp('sales-agent', []);
-    expect(output).toContain('sales-agent');
-  });
-
-  it('lists agent skills', () => {
-    const output = formatInSessionHelp('dev-agent', ['tdd', 'debugging']);
-    expect(output).toContain('/tdd');
-    expect(output).toContain('/debugging');
-  });
-
-  it('notes that Claude Code /help still works', () => {
-    const output = formatInSessionHelp('test', []);
-    expect(output).toContain('/help');
-    expect(output).toContain('Claude Code');
+  it('does not reference in-session miyagi commands', () => {
+    const output = formatTerminalHelp();
+    expect(output).not.toContain('/miyagi:');
   });
 });
