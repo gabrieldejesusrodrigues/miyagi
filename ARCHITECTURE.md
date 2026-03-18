@@ -71,7 +71,7 @@ SessionManager                 ClaudeBridge            TemplateLoader
 - Global: `~/.miyagi/agents/{name}/`
 - Project-local: `{cwd}/.miyagi/agents/{name}/` (checked first, shadows global)
 
-**SkillManager** — Manages skills within an agent's `skills/` directory. Parses `SKILL.md` frontmatter for metadata. Tracks installed vs custom skills via `.installed-skills.json`. Shells out to `npx skills add` for installation.
+**SkillManager** — Manages skills within an agent's `skills/` directory. Parses `SKILL.md` frontmatter for metadata. Tracks installed vs custom skills via `.installed-skills.json`. Installs skills by cloning GitHub repos to a temp dir, discovering skills inside the `skills/` subfolder (or root `SKILL.md` for single-skill repos), copying selected skill directories to the agent's `skills/` dir, and cleaning up the temp dir. Supports interactive multi-select via inquirer and `--skill` flag for targeted installs. After installation, uses ClaudeBridge (sonnet) to update the agent's `identity.md` with skill usage directives.
 
 **SessionManager** — Persists Claude session records to `sessions.json`. Standalone — depends only on `fs` and `crypto`.
 

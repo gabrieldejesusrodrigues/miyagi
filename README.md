@@ -123,7 +123,8 @@ When you `use` an agent, Miyagi injects the agent's identity, context files, and
 |:--------|:------------|
 | `miyagi create skill <name>` | Create a custom skill for an agent |
 | `miyagi list skills --agent <name>` | List all skills for an agent |
-| `miyagi install skill <source> <agent>` | Install a skill from [skills.sh](https://skills.sh) |
+| `miyagi install skills <source> <agent>` | Install skills interactively from a repo (e.g. `anthropics/skills`) |
+| `miyagi install skills <source> --skill <name> <agent>` | Install a specific skill by name |
 | `miyagi update skills <agent>` | Update all installed skills |
 
 ### Reports & Utilities
@@ -307,8 +308,14 @@ Any flag that Claude Code supports, Miyagi supports.
 Skills extend your agent's capabilities. They can be custom-built or installed from the [skills.sh](https://skills.sh) community marketplace.
 
 ```bash
-# Install a community skill
-miyagi install skill code-review my-developer
+# Install skills interactively (shows checkbox to select)
+miyagi install skills anthropics/skills my-developer
+
+# Install a specific skill by name
+miyagi install skills anthropics/skills --skill frontend-design my-developer
+
+# Skip AI identity integration
+miyagi install skills anthropics/skills --skill pdf my-developer --no-integrate
 
 # Create a custom skill
 miyagi create skill my-skill --agent my-developer
@@ -319,6 +326,8 @@ miyagi list skills --agent my-developer
 # Keep skills up to date
 miyagi update skills my-developer
 ```
+
+After installing, Miyagi uses Claude (sonnet) to automatically update the agent's `identity.md` with directives about when and how to use each new skill.
 
 When you `use` an agent, its skills are automatically available as slash commands in the Claude Code session.
 

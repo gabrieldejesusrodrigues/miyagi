@@ -49,7 +49,7 @@ Each directory is an independent area. Agents working on one area should not nee
 ### `src/core/` — Core Infrastructure
 - `config.ts` — ConfigManager: loads/saves `~/.miyagi/config.json`, manages directory structure (`agentsDir`, `templatesDir`, `reportsDir`)
 - `agent-manager.ts` — AgentManager: CRUD for agents in `~/.miyagi/agents/`
-- `skill-manager.ts` — SkillManager: list/install/remove skills per agent
+- `skill-manager.ts` — SkillManager: list/install/remove skills per agent. Installs by cloning GitHub repos to temp dir, discovering skills via `SKILL.md`, copying to agent's `skills/` dir. Supports interactive multi-select and `--skill` flag. Uses ClaudeBridge (sonnet) to update agent's `identity.md` with skill directives after installation.
 - `session-manager.ts` — SessionManager: records Claude session history
 - `claude-bridge.ts` — ClaudeBridge: spawns `claude` CLI processes, builds arg arrays. Supports `cwd` parameter for isolated workspaces.
 - `impersonation.ts` — ImpersonationManager: symlinks skills, builds system prompt, cleanup traps
