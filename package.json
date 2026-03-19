@@ -1,6 +1,6 @@
 {
   "name": "miyagi-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Agent & Skill Trainer for Claude Code — create, battle, and coach AI agents",
   "type": "module",
   "bin": {
