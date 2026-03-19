@@ -4,6 +4,7 @@ import { ConfigManager } from '../../core/config.js';
 import { AgentManager } from '../../core/agent-manager.js';
 import { SkillManager } from '../../core/skill-manager.js';
 import { TemplateLoader } from '../../core/template-loader.js';
+import { InteractiveCreator } from '../../core/interactive-creator.js';
 
 export function registerAgentCommands(program: Command): void {
   program
@@ -20,15 +21,27 @@ export function registerAgentCommands(program: Command): void {
         const agentManager = new AgentManager(config, process.cwd());
 
         if (type === 'agent') {
-          const agent = await agentManager.create(name, {
-            author: process.env.USER ?? 'unknown',
-            templateOrigin: options.template,
-          });
           if (options.template) {
+            // Template flow: create from template without interaction
+            const agent = await agentManager.create(name, {
+              author: process.env.USER ?? 'unknown',
+              templateOrigin: options.template,
+            });
             const templateLoader = new TemplateLoader();
             templateLoader.applyTemplate(options.template, agent.rootDir);
+            console.log(`Agent "${name}" created successfully.`);
+          } else {
+            // Interactive flow: gather input + generate identity with Claude
+            const creator = new InteractiveCreator();
+            const result = await creator.run(name);
+            await agentManager.create(name, {
+              author: process.env.USER ?? 'unknown',
+              description: result.description,
+              domains: result.domains,
+              identity: result.identity,
+            });
+            console.log(`Agent "${name}" created successfully.`);
           }
-          console.log(`Agent "${name}" created successfully.`);
         } else {
           console.error(`Unknown type "${type}". Supported types: agent`);
           process.exit(1);

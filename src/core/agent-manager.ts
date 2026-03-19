@@ -11,6 +11,8 @@ interface CreateOptions {
   author: string;
   description?: string;
   templateOrigin?: string;
+  domains?: string[];
+  identity?: string;
 }
 
 export class AgentManager {
@@ -46,13 +48,14 @@ export class AgentManager {
       version: '1.0.0',
       author: options.author,
       description: options.description,
+      domains: options.domains,
       templateOrigin: options.templateOrigin,
       createdAt: new Date().toISOString(),
     };
     writeFileSync(join(agentDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 
-    const identity = `# ${name}\n\n## Personality\n\n## Strategy\n\n## Skill Directives\n\n## Context References\n`;
-    writeFileSync(join(agentDir, 'identity.md'), identity);
+    const identityContent = options.identity ?? `# ${name}\n\n## Personality\n\n## Strategy\n\n## Skill Directives\n\n## Context References\n`;
+    writeFileSync(join(agentDir, 'identity.md'), identityContent);
 
     const stats: AgentStats = {
       agent: name,
