@@ -132,8 +132,18 @@ describe('mapStepsToRounds', () => {
   it('handles uneven distribution (7 steps, 3 rounds)', () => {
     const result = mapStepsToRounds(steps(7), 3);
     expect(result).toHaveLength(3);
+    // floor(7/3)=2, remainder=1 → first round gets 3, rest get 2
     expect(result[0]).toHaveLength(3);
-    expect(result[1]).toHaveLength(3);
+    expect(result[1]).toHaveLength(2);
+    expect(result[2]).toHaveLength(2);
+  });
+
+  it('avoids empty rounds when possible (4 steps, 3 rounds)', () => {
+    const result = mapStepsToRounds(steps(4), 3);
+    expect(result).toHaveLength(3);
+    // floor(4/3)=1, remainder=1 → first round gets 2, rest get 1
+    expect(result[0]).toHaveLength(2);
+    expect(result[1]).toHaveLength(1);
     expect(result[2]).toHaveLength(1);
   });
 

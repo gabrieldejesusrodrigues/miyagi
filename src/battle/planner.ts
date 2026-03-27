@@ -34,15 +34,15 @@ export function parsePlan(raw: string): ExecutionPlan {
 export function mapStepsToRounds(steps: PlanStep[], maxRounds: number): PlanStep[][] {
   if (maxRounds === 1) return [steps];
 
-  const perRound = Math.ceil(steps.length / maxRounds);
+  const base = Math.floor(steps.length / maxRounds);
+  const remainder = steps.length % maxRounds;
   const assignments: PlanStep[][] = [];
 
-  for (let i = 0; i < steps.length; i += Math.max(perRound, 1)) {
-    assignments.push(steps.slice(i, i + Math.max(perRound, 1)));
-  }
-
-  while (assignments.length < maxRounds) {
-    assignments.push([]);
+  let offset = 0;
+  for (let r = 0; r < maxRounds; r++) {
+    const count = base + (r < remainder ? 1 : 0);
+    assignments.push(steps.slice(offset, offset + count));
+    offset += count;
   }
 
   return assignments;
@@ -73,6 +73,7 @@ Considerations:
 - The plan must cover the ENTIRE task — nothing should be left unaddressed
 - Be specific: name the functions, files, patterns, or techniques you will use
 - Think about edge cases, testing, and quality — not just the happy path
+- Do NOT reference round numbers in your step titles or descriptions — focus on WHAT to do, not WHEN
 
 IMPORTANT: Your plan should describe how to produce the DELIVERABLE that the task
 asks for. If the task asks you to write code, your steps should describe how to
