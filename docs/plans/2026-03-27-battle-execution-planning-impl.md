@@ -352,15 +352,15 @@ Add to `src/battle/planner.ts`:
 export function mapStepsToRounds(steps: PlanStep[], maxRounds: number): PlanStep[][] {
   if (maxRounds === 1) return [steps];
 
-  const perRound = Math.ceil(steps.length / maxRounds);
+  const base = Math.floor(steps.length / maxRounds);
+  const remainder = steps.length % maxRounds;
   const assignments: PlanStep[][] = [];
 
-  for (let i = 0; i < steps.length; i += Math.max(perRound, 1)) {
-    assignments.push(steps.slice(i, i + Math.max(perRound, 1)));
-  }
-
-  while (assignments.length < maxRounds) {
-    assignments.push([]);
+  let offset = 0;
+  for (let r = 0; r < maxRounds; r++) {
+    const count = base + (r < remainder ? 1 : 0);
+    assignments.push(steps.slice(offset, offset + count));
+    offset += count;
   }
 
   return assignments;

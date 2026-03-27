@@ -27,7 +27,7 @@ Add a **planning phase (round 0)** before execution rounds in all symmetric batt
 | Round counting | Planning is extra (not counted in maxRounds) | Preserves meaning of maxRounds as execution rounds |
 | Plan format | Markdown (not JSON) | LLMs produce Markdown naturally; robust parsing via regex |
 | Step dependencies | Implicit (listed in order) | Explicit dependencies add complexity without benefit |
-| Round mapping | Heuristic (ceil(N/M) steps per round) | Simple, deterministic, no extra AI call |
+| Round mapping | Balanced heuristic (floor(N/M) + remainder) | Simple, deterministic, no extra AI call, avoids empty rounds |
 | Execution prompt | Directed per round (multi-round) / full plan (single-round) | Prevents front/back-loading of work |
 | Deliverable declaration | Agent declares deliverable type in plan | Prevents meta-planning confusion (e.g., task IS a plan) |
 | Fallback | Falls back to current behavior if parsing fails | Graceful degradation, no breakage |
@@ -160,26 +160,24 @@ the plan is your roadmap, not your output.
 
 ```typescript
 function mapStepsToRounds(steps: PlanStep[], maxRounds: number): PlanStep[][] {
-  if (maxRounds === 1) return [steps]; // single-round: all together
+  if (maxRounds === 1) return [steps];
 
-  const perRound = Math.ceil(steps.length / maxRounds);
+  const base = Math.floor(steps.length / maxRounds);
+  const remainder = steps.length % maxRounds;
   const assignments: PlanStep[][] = [];
 
-  for (let i = 0; i < steps.length; i += perRound) {
-    assignments.push(steps.slice(i, i + perRound));
-  }
-
-  // If fewer steps than rounds, extra rounds get empty arrays
-  // (will receive "review and polish" instruction)
-  while (assignments.length < maxRounds) {
-    assignments.push([]);
+  let offset = 0;
+  for (let r = 0; r < maxRounds; r++) {
+    const count = base + (r < remainder ? 1 : 0);
+    assignments.push(steps.slice(offset, offset + count));
+    offset += count;
   }
 
   return assignments;
 }
 ```
 
-**Edge case:** If agent generates fewer steps than rounds (e.g., 2 steps, 3 rounds), extra rounds receive: "Review, test, and polish your previous work."
+**Distribution:** Balanced `floor(N/M) + remainder` avoids empty rounds. First `remainder` rounds get one extra step (e.g., 4 steps / 3 rounds → [2, 1, 1]). Empty rounds only occur when steps < rounds (unavoidable).
 
 ### Plan Parsing
 

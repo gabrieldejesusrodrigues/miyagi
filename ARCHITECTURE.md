@@ -121,7 +121,7 @@ background.ts                  runner.ts
 **BattlePlanner** (`planner.ts`) — Pure functions for the planning phase of symmetric battles:
 - `buildPlanningPrompt()` — Generates the round 0 prompt that instructs agents to create an execution plan with deliverable declaration, approach, and steps in structured Markdown
 - `parsePlan()` — Parses agent plan output (Markdown) into an `ExecutionPlan` (deliverable, approach, steps[])
-- `mapStepsToRounds()` — Distributes plan steps across execution rounds via `ceil(N/M)` heuristic
+- `mapStepsToRounds()` — Distributes plan steps across execution rounds via balanced `floor(N/M) + remainder` heuristic to avoid empty rounds
 - `buildExecutionPrompt()` — Generates per-round execution prompts that direct agents to specific plan steps, referencing the declared deliverable to prevent meta-planning confusion
 
 **BattleMediator** — Handles turn-by-turn asymmetric battles. Builds role-specific prompts from `BattleModeConfig`, maintains conversation history, and detects natural termination signals (`[END_CONVERSATION]`, `[DEAL_CLOSED]`, etc.).
