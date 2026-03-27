@@ -116,7 +116,13 @@ background.ts                  runner.ts
   └── listBattles()
 ```
 
-**BattleEngine** — Creates `BattleConfig` objects with unique IDs, validates modes against the registry, and assembles final `BattleResult` objects from collected rounds. Runs agents in persistent isolated temp directories (`/tmp/miyagi-battle-*`) with `--dangerously-skip-permissions` so agents can write and execute code. Workspaces persist across rounds so agents can build iteratively. Collects actual generated files (up to 30KB, blacklisting `node_modules`, lock files, etc.) from the final workspace and appends to the last round response for judge/coach evaluation. 10-minute timeout per agent call. Cleanup via `finally` blocks.
+**BattleEngine** — Creates `BattleConfig` objects with unique IDs, validates modes against the registry, and assembles final `BattleResult` objects from collected rounds. Runs agents in persistent isolated temp directories (`/tmp/miyagi-battle-*`) with `--dangerously-skip-permissions` so agents can write and execute code. Workspaces persist across rounds so agents can build iteratively. Collects actual generated files (up to 30KB, blacklisting `node_modules`, lock files, etc.) from the final workspace and appends to the last round response for judge/coach evaluation. 10-minute timeout per agent call. Cleanup via `finally` blocks. Symmetric battles include a **planning phase (round 0)** where each agent independently generates an execution plan before the execution rounds begin (see Battle Planner below).
+
+**BattlePlanner** (`planner.ts`) — Pure functions for the planning phase of symmetric battles:
+- `buildPlanningPrompt()` — Generates the round 0 prompt that instructs agents to create an execution plan with deliverable declaration, approach, and steps in structured Markdown
+- `parsePlan()` — Parses agent plan output (Markdown) into an `ExecutionPlan` (deliverable, approach, steps[])
+- `mapStepsToRounds()` — Distributes plan steps across execution rounds via `ceil(N/M)` heuristic
+- `buildExecutionPrompt()` — Generates per-round execution prompts that direct agents to specific plan steps, referencing the declared deliverable to prevent meta-planning confusion
 
 **BattleMediator** — Handles turn-by-turn asymmetric battles. Builds role-specific prompts from `BattleModeConfig`, maintains conversation history, and detects natural termination signals (`[END_CONVERSATION]`, `[DEAL_CLOSED]`, etc.).
 
@@ -201,6 +207,7 @@ agent.ts    ── AgentManifest, Agent, InstalledSkillEntry
 skill.ts    ── SkillMetadata, AgentSkill
 battle.ts   ── BattleType, BattleMode (10 literals), BattleModeConfig,
                BattleConfig, BattleRound, BattleResult,
+               PlanStep, ExecutionPlan,
                BattleStatus, BackgroundBattleConfig, BackgroundBattleInfo
 scoring.ts  ── DimensionScore, AgentStats, JudgeVerdict, AgentAnalysis
 config.ts   ── MiyagiConfig, SessionEntry
@@ -218,12 +225,18 @@ All modules import types from `../types/index.js`. Types are interfaces/type ali
 3. Configure: BattleEngine.createConfig() → BattleConfig
          │
 4. Execute: Create persistent temp dirs per agent (/tmp/miyagi-battle-*)
-         │   For each round:
-         │   ├── BattleMediator.buildRolePrompts() (asymmetric only)
-         │   ├── BattleMediator.buildTurnPrompt() with history
+         │   Symmetric battles:
+         │   ├── Phase 0 (Planning): buildPlanningPrompt() → agents generate plans in parallel
+         │   ├── parsePlan() → extract deliverable, approach, steps from each plan
+         │   ├── mapStepsToRounds() → distribute steps across execution rounds
+         │   ├── For each round: buildExecutionPrompt() with assigned steps + previous outputs
          │   ├── ClaudeBridge.runAndCapture(cwd=tempDir, --dangerously-skip-permissions)
-         │   ├── BattleMediator.isNaturalEnd() check
-         │   └── Collect BattleRound
+         │   └── Falls back to raw task prompt if plan parsing fails
+         │   Asymmetric battles:
+         │   ├── BattleMediator.buildRolePrompts()
+         │   ├── For each round: BattleMediator.buildTurnPrompt() with history
+         │   ├── ClaudeBridge.runAndCapture(cwd=tempDir, --dangerously-skip-permissions)
+         │   └── BattleMediator.isNaturalEnd() check
          │   After last round:
          │   ├── collectGeneratedFiles(tempDir) → append actual code to last round
          │   └── Cleanup temp dirs (finally block)
