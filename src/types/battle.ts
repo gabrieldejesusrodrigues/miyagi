@@ -39,9 +39,23 @@ export interface BattleRound {
   timestamp: string;
 }
 
+export interface PlanStep {
+  number: number;
+  title: string;
+  description: string;
+}
+
+export interface ExecutionPlan {
+  deliverable: string;
+  approach: string;
+  steps: PlanStep[];
+}
+
 export interface BattleResult {
   config: BattleConfig;
   rounds: BattleRound[];
+  planA?: ExecutionPlan;
+  planB?: ExecutionPlan;
   endedAt: string;
   terminationReason: 'natural' | 'round-limit' | 'user-stopped' | 'judge-called';
 }

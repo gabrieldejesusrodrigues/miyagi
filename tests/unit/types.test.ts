@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { PlanStep, ExecutionPlan, BattleResult } from '../../src/types/index.js';
 import {
   validateManifest,
   validateStatsJson,
@@ -49,5 +50,38 @@ describe('Installed skills validation', () => {
   it('rejects non-array', () => {
     const result = validateInstalledSkills('not-an-array');
     expect(result.valid).toBe(false);
+  });
+});
+
+describe('Plan types', () => {
+  it('PlanStep type has required fields', () => {
+    const step: PlanStep = { number: 1, title: 'Setup', description: 'Init project' };
+    expect(step.number).toBe(1);
+    expect(step.title).toBe('Setup');
+    expect(step.description).toBe('Init project');
+  });
+
+  it('ExecutionPlan type has deliverable, approach, and steps', () => {
+    const plan: ExecutionPlan = {
+      deliverable: 'Working REST API',
+      approach: 'Start with tests',
+      steps: [{ number: 1, title: 'Write tests', description: 'TDD' }],
+    };
+    expect(plan.deliverable).toBe('Working REST API');
+    expect(plan.approach).toBe('Start with tests');
+    expect(plan.steps).toHaveLength(1);
+  });
+
+  it('BattleResult accepts optional plan fields', () => {
+    const result: BattleResult = {
+      config: {} as any,
+      rounds: [],
+      endedAt: '2026-01-01',
+      terminationReason: 'round-limit',
+      planA: { deliverable: 'Code', approach: 'A', steps: [] },
+      planB: { deliverable: 'Code', approach: 'B', steps: [] },
+    };
+    expect(result.planA?.approach).toBe('A');
+    expect(result.planB?.approach).toBe('B');
   });
 });
