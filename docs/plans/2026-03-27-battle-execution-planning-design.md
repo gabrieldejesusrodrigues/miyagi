@@ -29,6 +29,7 @@ Add a **planning phase (round 0)** before execution rounds in all symmetric batt
 | Step dependencies | Implicit (listed in order) | Explicit dependencies add complexity without benefit |
 | Round mapping | Heuristic (ceil(N/M) steps per round) | Simple, deterministic, no extra AI call |
 | Execution prompt | Directed per round (multi-round) / full plan (single-round) | Prevents front/back-loading of work |
+| Deliverable declaration | Agent declares deliverable type in plan | Prevents meta-planning confusion (e.g., task IS a plan) |
 | Fallback | Falls back to current behavior if parsing fails | Graceful degradation, no breakage |
 
 ## Architecture
@@ -42,8 +43,8 @@ BattleEngine.runSymmetric()
   |   +- buildPlanningPrompt(taskLabel, modeName, modeDescription, maxRounds)
   |   +- bridge.runAndCapture() for Agent A -> rawPlanA  \
   |   +- bridge.runAndCapture() for Agent B -> rawPlanB  / in parallel
-  |   +- parsePlan(rawPlanA) -> { approach, steps[] }
-  |   +- parsePlan(rawPlanB) -> { approach, steps[] }
+  |   +- parsePlan(rawPlanA) -> { deliverable, approach, steps[] }
+  |   +- parsePlan(rawPlanB) -> { deliverable, approach, steps[] }
   |
   +- Mapping (NEW)
   |   +- mapStepsToRounds(planA.steps, maxRounds) -> roundAssignmentsA
@@ -84,9 +85,19 @@ Considerations:
 - Be specific: name the functions, files, patterns, or techniques you will use
 - Think about edge cases, testing, and quality -- not just the happy path
 
+IMPORTANT: Your plan should describe how to produce the DELIVERABLE that the task
+asks for. If the task asks you to write code, your steps should describe how to
+build that code. If the task asks you to create a plan, document, or analysis,
+your steps should describe how to structure and write that document -- do NOT
+plan to implement what the document describes.
+
 ## Output Format
 
 Use this exact structure:
+
+## Deliverable
+<One sentence describing what the final output should be: working code, a design
+document, an analysis report, a project plan, etc.>
 
 ## Approach
 <One paragraph summarizing your overall strategy and rationale>
@@ -106,6 +117,9 @@ Use this exact structure:
 ```
 You are competing in a battle. Execute your plan completely.
 
+## Your Deliverable
+{deliverable}
+
 ## Your Plan
 {fullPlan}
 
@@ -113,13 +127,17 @@ You are competing in a battle. Execute your plan completely.
 {taskLabel}
 
 ## Instructions
-Execute ALL steps of your plan. Deliver the complete solution.
+Execute ALL steps of your plan. Your output must directly produce the
+deliverable described above -- the plan is your roadmap, not your output.
 ```
 
 ### Execution Prompt -- Multi-Round
 
 ```
 You are competing in a battle. This is round {round} of {maxRounds}.
+
+## Your Deliverable
+{deliverable}
 
 ## Your Full Plan
 {fullPlan}
@@ -134,7 +152,8 @@ Execute the following steps:
 
 ## Instructions
 Focus on the steps assigned to this round. Build on any previous work.
-Your output should advance the plan toward completion.
+Your output must directly produce the deliverable described above --
+the plan is your roadmap, not your output.
 ```
 
 ### Mapping Heuristic
@@ -172,11 +191,16 @@ interface PlanStep {
 }
 
 interface ExecutionPlan {
+  deliverable: string;
   approach: string;
   steps: PlanStep[];
 }
 
 function parsePlan(raw: string): ExecutionPlan {
+  // Extract deliverable: content between "## Deliverable" and "## Approach"
+  const deliverableMatch = raw.match(/## Deliverable\s*\n([\s\S]*?)(?=\n## Approach)/i);
+  const deliverable = deliverableMatch?.[1]?.trim() ?? '';
+
   // Extract approach: content between "## Approach" and "## Steps"
   const approachMatch = raw.match(/## Approach\s*\n([\s\S]*?)(?=\n## Steps)/i);
   const approach = approachMatch?.[1]?.trim() ?? '';
@@ -193,7 +217,7 @@ function parsePlan(raw: string): ExecutionPlan {
     });
   }
 
-  return { approach, steps };
+  return { deliverable, approach, steps };
 }
 ```
 
@@ -210,6 +234,7 @@ export interface PlanStep {
 }
 
 export interface ExecutionPlan {
+  deliverable: string;
   approach: string;
   steps: PlanStep[];
 }

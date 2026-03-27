@@ -30,11 +30,13 @@ it('PlanStep type has required fields', () => {
   expect(step.description).toBe('Init project');
 });
 
-it('ExecutionPlan type has approach and steps', () => {
+it('ExecutionPlan type has deliverable, approach, and steps', () => {
   const plan: ExecutionPlan = {
+    deliverable: 'Working REST API',
     approach: 'Start with tests',
     steps: [{ number: 1, title: 'Write tests', description: 'TDD' }],
   };
+  expect(plan.deliverable).toBe('Working REST API');
   expect(plan.approach).toBe('Start with tests');
   expect(plan.steps).toHaveLength(1);
 });
@@ -45,8 +47,8 @@ it('BattleResult accepts optional plan fields', () => {
     rounds: [],
     endedAt: '2026-01-01',
     terminationReason: 'round-limit',
-    planA: { approach: 'A', steps: [] },
-    planB: { approach: 'B', steps: [] },
+    planA: { deliverable: 'Code', approach: 'A', steps: [] },
+    planB: { deliverable: 'Code', approach: 'B', steps: [] },
   };
   expect(result.planA?.approach).toBe('A');
   expect(result.planB?.approach).toBe('B');
@@ -70,6 +72,7 @@ export interface PlanStep {
 }
 
 export interface ExecutionPlan {
+  deliverable: string;
   approach: string;
   steps: PlanStep[];
 }
@@ -118,7 +121,10 @@ import { parsePlan } from '../../src/battle/planner.js';
 
 describe('parsePlan', () => {
   it('parses a well-formed markdown plan', () => {
-    const raw = `## Approach
+    const raw = `## Deliverable
+A fully typed data layer with unit tests.
+
+## Approach
 Build incrementally with tests first.
 
 ## Steps
@@ -132,6 +138,7 @@ Write the business logic using the interfaces.
 Write unit tests for all functions.`;
 
     const plan = parsePlan(raw);
+    expect(plan.deliverable).toBe('A fully typed data layer with unit tests.');
     expect(plan.approach).toBe('Build incrementally with tests first.');
     expect(plan.steps).toHaveLength(3);
     expect(plan.steps[0]).toEqual({ number: 1, title: 'Define interfaces', description: 'Create TypeScript interfaces for the data model.' });
@@ -140,7 +147,10 @@ Write unit tests for all functions.`;
   });
 
   it('parses plan with multi-line step descriptions', () => {
-    const raw = `## Approach
+    const raw = `## Deliverable
+A bundled project.
+
+## Approach
 My approach.
 
 ## Steps
@@ -162,12 +172,16 @@ Compile and bundle.`;
   it('returns empty plan when format is unrecognizable', () => {
     const raw = 'Just some random text without proper headers.';
     const plan = parsePlan(raw);
+    expect(plan.deliverable).toBe('');
     expect(plan.approach).toBe('');
     expect(plan.steps).toHaveLength(0);
   });
 
   it('handles plan with extra whitespace and blank lines', () => {
-    const raw = `## Approach
+    const raw = `## Deliverable
+Working code.
+
+## Approach
 
   My strategy with leading spaces.
 
@@ -189,6 +203,9 @@ Do the second thing.
 
   it('handles plan wrapped in extra LLM output', () => {
     const raw = `Sure! Here is my plan:
+
+## Deliverable
+Complete solution.
 
 ## Approach
 Focused approach.
@@ -220,6 +237,9 @@ Create `src/battle/planner.ts`:
 import type { PlanStep, ExecutionPlan } from '../types/index.js';
 
 export function parsePlan(raw: string): ExecutionPlan {
+  const deliverableMatch = raw.match(/## Deliverable\s*\n([\s\S]*?)(?=\n## Approach)/i);
+  const deliverable = deliverableMatch?.[1]?.trim() ?? '';
+
   const approachMatch = raw.match(/## Approach\s*\n([\s\S]*?)(?=\n## Steps)/i);
   const approach = approachMatch?.[1]?.trim() ?? '';
 
@@ -235,7 +255,7 @@ export function parsePlan(raw: string): ExecutionPlan {
     });
   }
 
-  return { approach, steps };
+  return { deliverable, approach, steps };
 }
 ```
 
@@ -391,11 +411,17 @@ describe('buildPlanningPrompt', () => {
     expect(prompt).toContain('3 round(s)');
   });
 
-  it('includes output format instructions', () => {
+  it('includes output format instructions with deliverable', () => {
     const prompt = buildPlanningPrompt('Task', 'same-task', 'Same task', 1);
+    expect(prompt).toContain('## Deliverable');
     expect(prompt).toContain('## Approach');
     expect(prompt).toContain('## Steps');
     expect(prompt).toContain('### 1.');
+  });
+
+  it('includes deliverable disambiguation warning', () => {
+    const prompt = buildPlanningPrompt('Build a plan for Feature X', 'same-task', 'Same task', 1);
+    expect(prompt).toContain('do NOT plan to implement what the document describes');
   });
 });
 ```
@@ -436,9 +462,19 @@ Considerations:
 - Be specific: name the functions, files, patterns, or techniques you will use
 - Think about edge cases, testing, and quality — not just the happy path
 
+IMPORTANT: Your plan should describe how to produce the DELIVERABLE that the task
+asks for. If the task asks you to write code, your steps should describe how to
+build that code. If the task asks you to create a plan, document, or analysis,
+your steps should describe how to structure and write that document — do NOT
+plan to implement what the document describes.
+
 ## Output Format
 
 Use this exact structure:
+
+## Deliverable
+<One sentence describing what the final output should be: working code, a design
+document, an analysis report, a project plan, etc.>
 
 ## Approach
 <One paragraph summarizing your overall strategy and rationale>
@@ -484,6 +520,7 @@ import type { PlanStep, ExecutionPlan } from '../../src/types/index.js';
 
 describe('buildExecutionPrompt', () => {
   const plan: ExecutionPlan = {
+    deliverable: 'Working REST API with tests',
     approach: 'Test-first approach',
     steps: [
       { number: 1, title: 'Setup', description: 'Init project' },
@@ -492,7 +529,7 @@ describe('buildExecutionPrompt', () => {
     ],
   };
 
-  it('builds single-round prompt with full plan', () => {
+  it('builds single-round prompt with full plan and deliverable', () => {
     const prompt = buildExecutionPrompt({
       taskLabel: 'Build an API',
       plan,
@@ -501,11 +538,12 @@ describe('buildExecutionPrompt', () => {
       maxRounds: 1,
     });
     expect(prompt).toContain('Execute your plan completely');
+    expect(prompt).toContain('Working REST API with tests');
     expect(prompt).toContain('Build an API');
     expect(prompt).toContain('Setup');
     expect(prompt).toContain('Implement');
     expect(prompt).toContain('Test');
-    expect(prompt).toContain('Execute ALL steps');
+    expect(prompt).toContain('the plan is your roadmap, not your output');
   });
 
   it('builds multi-round prompt with assigned steps', () => {
@@ -577,6 +615,9 @@ export function buildExecutionPrompt(opts: ExecutionPromptOptions): string {
   if (maxRounds === 1) {
     return `You are competing in a battle. Execute your plan completely.
 
+## Your Deliverable
+${plan.deliverable || taskLabel}
+
 ## Your Plan
 ${fullPlanText}
 
@@ -584,7 +625,8 @@ ${fullPlanText}
 ${taskLabel}
 
 ## Instructions
-Execute ALL steps of your plan. Deliver the complete solution.`;
+Execute ALL steps of your plan. Your output must directly produce the
+deliverable described above — the plan is your roadmap, not your output.`;
   }
 
   const stepsSection = assignedSteps.length > 0
@@ -596,6 +638,9 @@ Execute ALL steps of your plan. Deliver the complete solution.`;
     : 'This is the first execution round.';
 
   return `You are competing in a battle. This is round ${round} of ${maxRounds}.
+
+## Your Deliverable
+${plan.deliverable || taskLabel}
 
 ## Your Full Plan
 ${fullPlanText}
@@ -610,11 +655,14 @@ ${previousSection}
 
 ## Instructions
 Focus on the steps assigned to this round. Build on any previous work.
-Your output should advance the plan toward completion.`;
+Your output must directly produce the deliverable described above —
+the plan is your roadmap, not your output.`;
 }
 
 function formatPlan(plan: ExecutionPlan): string {
-  let text = `## Approach\n${plan.approach}\n\n## Steps\n`;
+  let text = '';
+  if (plan.deliverable) text += `## Deliverable\n${plan.deliverable}\n\n`;
+  text += `## Approach\n${plan.approach}\n\n## Steps\n`;
   for (const step of plan.steps) {
     text += `### ${step.number}. ${step.title}\n${step.description}\n\n`;
   }
@@ -653,7 +701,10 @@ it('runSymmetric includes planning phase before execution rounds', async () => {
   config.maxRounds = 1;
 
   // Planning phase returns a valid markdown plan
-  const planResponse = `## Approach
+  const planResponse = `## Deliverable
+Working solution.
+
+## Approach
 My strategy.
 
 ## Steps
@@ -705,7 +756,10 @@ it('runSymmetric distributes steps across multiple rounds', async () => {
   const config = makeConfig();
   config.maxRounds = 2;
 
-  const planResponse = `## Approach
+  const planResponse = `## Deliverable
+Fully implemented and tested API.
+
+## Approach
 Incremental.
 
 ## Steps
@@ -926,7 +980,7 @@ it('emits planning phase progress event', async () => {
   const config = makeConfig();
   const events: any[] = [];
 
-  const planResponse = `## Approach\nStrategy.\n\n## Steps\n### 1. Do it\nDo the thing.`;
+  const planResponse = `## Deliverable\nCompleted task.\n\n## Approach\nStrategy.\n\n## Steps\n### 1. Do it\nDo the thing.`;
   let callIndex = 0;
   mockBridge.runAndCapture = async () => {
     callIndex++;
