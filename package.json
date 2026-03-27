@@ -77,6 +77,11 @@
     "simple-git": "^3.33.0",
     "tar": "^7.5.11"
   },
+  "pnpm": {
+    "overrides": {
+      "picomatch": ">=4.0.4"
+    }
+  },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
     "@types/archiver": "^7.0.0",
