@@ -55,11 +55,16 @@ describe('BattleEngine progress callbacks', () => {
 
     await engine.runSymmetric(config, agentManager, bridge, undefined, onProgress);
 
-    // round/start event
-    expect(events[0]).toMatchObject({ phase: 'round', type: 'start', round: 1, totalRounds: 1 });
+    // planning phase event first
+    expect(events[0]).toMatchObject({ phase: 'setup', type: 'info', message: 'Planning phase' });
 
-    // info events for both agents (emitted before awaiting)
-    const infoEvents = events.filter(e => e.type === 'info');
+    // round/start event after planning
+    const roundStartEvents = events.filter(e => e.phase === 'round' && e.type === 'start');
+    expect(roundStartEvents).toHaveLength(1);
+    expect(roundStartEvents[0]).toMatchObject({ phase: 'round', type: 'start', round: 1, totalRounds: 1 });
+
+    // info events for both agents during execution rounds
+    const infoEvents = events.filter(e => e.type === 'info' && e.phase === 'round');
     expect(infoEvents).toHaveLength(2);
     expect(infoEvents.some(e => e.agent === 'agent-a')).toBe(true);
     expect(infoEvents.some(e => e.agent === 'agent-b')).toBe(true);
