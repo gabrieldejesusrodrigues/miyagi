@@ -86,16 +86,14 @@ describe('BattleEngine temp directory management', () => {
     const mockBridge = new MockClaudeBridge();
     const config = makeConfig();
 
-    // Spy on mkdtempSync by checking that cwd values passed to runAndCapture
-    // are directories that exist (they must have been created)
     await engine.runSymmetric(config, mockAgentManager, mockBridge as any);
 
-    // runAndCapture was called twice (once per agent per round)
-    expect(mockBridge.calls).toHaveLength(2);
+    // 2 planning calls + 2 execution calls = 4 total
+    expect(mockBridge.calls).toHaveLength(4);
     // Each call should have received a cwd argument
     expect(mockBridge.calls[0].cwd).toBeDefined();
     expect(mockBridge.calls[1].cwd).toBeDefined();
-    // The two cwds should be different directories
+    // The two cwds should be different directories (planning calls use same dirs as execution)
     expect(mockBridge.calls[0].cwd).not.toBe(mockBridge.calls[1].cwd);
   });
 
@@ -106,11 +104,12 @@ describe('BattleEngine temp directory management', () => {
     let capturedCwdA: string | undefined;
     let capturedCwdB: string | undefined;
 
-    // Intercept to capture paths
+    // Intercept to capture paths (planning calls use same dirs)
     const originalRunAndCapture = mockBridge.runAndCapture.bind(mockBridge);
     let callCount = 0;
     mockBridge.runAndCapture = async (args, timeout, stdinData, cwd) => {
       callCount++;
+      // Capture from planning calls (1 and 2)
       if (callCount === 1) capturedCwdA = cwd;
       if (callCount === 2) capturedCwdB = cwd;
       return originalRunAndCapture(args, timeout, stdinData, cwd);
@@ -157,6 +156,123 @@ describe('BattleEngine temp directory management', () => {
     for (const call of mockBridge.calls) {
       expect(call.args).toContain('--dangerously-skip-permissions');
     }
+  });
+
+  it('runSymmetric includes planning phase before execution rounds', async () => {
+    const mockBridge = new MockClaudeBridge();
+    const config = makeConfig();
+    config.maxRounds = 1;
+
+    const planResponse = `## Deliverable
+Working solution.
+
+## Approach
+My strategy.
+
+## Steps
+### 1. Implement solution
+Write the code.`;
+
+    let callIndex = 0;
+    mockBridge.runAndCapture = async (args: string[], timeout?: number, stdinData?: string, cwd?: string) => {
+      callIndex++;
+      mockBridge.calls.push({ args, cwd });
+      if (callIndex <= 2) return planResponse;
+      return 'executed solution';
+    };
+
+    const result = await engine.runSymmetric(config, mockAgentManager, mockBridge as any);
+
+    expect(callIndex).toBe(4);
+    expect(result.planA).toBeDefined();
+    expect(result.planA!.approach).toBe('My strategy.');
+    expect(result.planA!.steps).toHaveLength(1);
+    expect(result.planA!.deliverable).toBe('Working solution.');
+    expect(result.planB).toBeDefined();
+  });
+
+  it('runSymmetric falls back to current behavior when plan parsing fails', async () => {
+    const mockBridge = new MockClaudeBridge();
+    const config = makeConfig();
+    config.maxRounds = 1;
+
+    let callIndex = 0;
+    mockBridge.runAndCapture = async (args: string[], timeout?: number, stdinData?: string, cwd?: string) => {
+      callIndex++;
+      mockBridge.calls.push({ args, cwd });
+      if (callIndex <= 2) return 'I cannot produce a plan in that format.';
+      return 'fallback execution';
+    };
+
+    const result = await engine.runSymmetric(config, mockAgentManager, mockBridge as any);
+
+    expect(result.rounds).toHaveLength(1);
+    expect(result.planA).toBeUndefined();
+    expect(result.planB).toBeUndefined();
+  });
+
+  it('runSymmetric distributes steps across multiple rounds', async () => {
+    const mockBridge = new MockClaudeBridge();
+    const config = makeConfig();
+    config.maxRounds = 2;
+
+    const planResponse = `## Deliverable
+Fully implemented and tested API.
+
+## Approach
+Incremental.
+
+## Steps
+### 1. Foundation
+Build base.
+
+### 2. Features
+Add features.
+
+### 3. Tests
+Write tests.
+
+### 4. Polish
+Clean up.`;
+
+    let callIndex = 0;
+    const stdinCaptures: string[] = [];
+    mockBridge.runAndCapture = async (args: string[], timeout?: number, stdinData?: string, cwd?: string) => {
+      callIndex++;
+      mockBridge.calls.push({ args, cwd });
+      if (stdinData) stdinCaptures.push(stdinData);
+      if (callIndex <= 2) return planResponse;
+      return 'round output';
+    };
+
+    const result = await engine.runSymmetric(config, mockAgentManager, mockBridge as any);
+
+    expect(result.rounds).toHaveLength(2);
+    expect(result.planA).toBeDefined();
+    expect(result.planA!.steps).toHaveLength(4);
+    // Execution stdinCaptures should reference specific steps
+    // Planning: captures 0,1 | Execution: captures 2,3 (round1 A,B), 4,5 (round2 A,B)
+    expect(stdinCaptures.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('emits planning phase progress event', async () => {
+    const mockBridge = new MockClaudeBridge();
+    const config = makeConfig();
+    const events: any[] = [];
+
+    const planResponse = `## Deliverable\nCompleted task.\n\n## Approach\nStrategy.\n\n## Steps\n### 1. Do it\nDo the thing.`;
+    let callIndex = 0;
+    mockBridge.runAndCapture = async (args: string[], timeout?: number, stdinData?: string, cwd?: string) => {
+      callIndex++;
+      mockBridge.calls.push({ args, cwd });
+      return callIndex <= 2 ? planResponse : 'output';
+    };
+
+    await engine.runSymmetric(config, mockAgentManager, mockBridge as any, undefined, (event) => {
+      events.push(event);
+    });
+
+    expect(events[0]).toEqual({ phase: 'setup', type: 'info', message: 'Planning phase' });
   });
 
   it('runAsymmetric creates and cleans up temp directories', async () => {
