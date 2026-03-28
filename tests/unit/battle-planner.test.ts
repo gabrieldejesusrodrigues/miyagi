@@ -105,6 +105,49 @@ I hope this helps!`;
     expect(plan.steps).toHaveLength(1);
     expect(plan.steps[0].description).not.toContain('I hope this helps');
   });
+
+  it('preserves multi-paragraph step descriptions', () => {
+    const raw = `## Deliverable
+Complete solution.
+
+## Approach
+My approach.
+
+## Steps
+### 1. Complex step
+First paragraph of instructions.
+
+Second paragraph with more detail.
+
+Third paragraph with examples.`;
+
+    const plan = parsePlan(raw);
+    expect(plan.steps).toHaveLength(1);
+    expect(plan.steps[0].description).toContain('First paragraph of instructions.');
+    expect(plan.steps[0].description).toContain('Second paragraph with more detail.');
+    expect(plan.steps[0].description).toContain('Third paragraph with examples.');
+  });
+
+  it('handles steps with title only and no description', () => {
+    const raw = `## Deliverable
+Code.
+
+## Approach
+Simple.
+
+## Steps
+### 1. Setup
+Initialize the project.
+
+### 2. Polish`;
+
+    const plan = parsePlan(raw);
+    expect(plan.steps).toHaveLength(2);
+    expect(plan.steps[0].title).toBe('Setup');
+    expect(plan.steps[0].description).toBe('Initialize the project.');
+    expect(plan.steps[1].title).toBe('Polish');
+    expect(plan.steps[1].description).toBe('');
+  });
 });
 
 describe('mapStepsToRounds', () => {

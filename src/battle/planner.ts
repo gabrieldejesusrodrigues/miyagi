@@ -1,4 +1,4 @@
-import type { PlanStep, ExecutionPlan } from '../types/index.js';
+import type { PlanStep, ExecutionPlan, ExecutionPromptOptions } from '../types/index.js';
 
 export function parsePlan(raw: string): ExecutionPlan {
   const deliverableMatch = raw.match(/## Deliverable\s*\n([\s\S]*?)(?=\n## Approach)/i);
@@ -17,13 +17,21 @@ export function parsePlan(raw: string): ExecutionPlan {
     const rest = chunks[i + 1];
     // First line is the title, remainder is the description
     const newlineIdx = rest.indexOf('\n');
-    if (newlineIdx === -1) continue;
-    const title = rest.slice(0, newlineIdx).trim();
-    let description = rest.slice(newlineIdx + 1);
+    const title = newlineIdx === -1 ? rest.trim() : rest.slice(0, newlineIdx).trim();
+    let description = newlineIdx === -1 ? '' : rest.slice(newlineIdx + 1);
     // For the last step, strip trailing LLM prose that appears after a blank
-    // line which itself follows some non-blank content (step body).
+    // line which itself follows the step body. Only strip when the description
+    // contains exactly one \n\n (single-paragraph body + one trailing section),
+    // to avoid cutting multi-paragraph step descriptions.
     if (i + 2 >= chunks.length) {
-      description = description.replace(/(\S[\s\S]*?)\n\n\S[\s\S]*$/, '$1');
+      const firstBlank = description.indexOf('\n\n');
+      const lastBlank = description.lastIndexOf('\n\n');
+      if (firstBlank !== -1 && firstBlank === lastBlank) {
+        const trailing = description.slice(lastBlank + 2);
+        if (/^\S/.test(trailing)) {
+          description = description.slice(0, lastBlank);
+        }
+      }
     }
     steps.push({ number: num, title, description: description.trim() });
   }
@@ -101,14 +109,6 @@ document, an analysis report, a project plan, etc.>
 (continue as needed)`;
 }
 
-interface ExecutionPromptOptions {
-  taskLabel: string;
-  plan: ExecutionPlan;
-  assignedSteps: PlanStep[];
-  round: number;
-  maxRounds: number;
-  previousOutputs?: string;
-}
 
 export function buildExecutionPrompt(opts: ExecutionPromptOptions): string {
   const { taskLabel, plan, assignedSteps, round, maxRounds, previousOutputs } = opts;
