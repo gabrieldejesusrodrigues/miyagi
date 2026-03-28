@@ -51,6 +51,15 @@ export interface ExecutionPlan {
   steps: PlanStep[];
 }
 
+export interface ExecutionPromptOptions {
+  taskLabel: string;
+  plan: ExecutionPlan;
+  assignedSteps: PlanStep[];
+  round: number;
+  maxRounds: number;
+  previousOutputs?: string;
+}
+
 export interface BattleResult {
   config: BattleConfig;
   rounds: BattleRound[];
