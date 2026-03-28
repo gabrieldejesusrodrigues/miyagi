@@ -151,10 +151,20 @@ export class BattleEngine {
       const planOptsA = { systemPrompt: identityA, prompt: planningPrompt, effort, dangerouslySkipPermissions: true };
       const planOptsB = { systemPrompt: identityB, prompt: planningPrompt, effort, dangerouslySkipPermissions: true };
 
-      const [rawPlanA, rawPlanB] = await Promise.all([
-        bridge.runAndCapture(bridge.buildBattleArgs(planOptsA), 600_000, bridge.buildBattleStdin(planOptsA), tempDirA),
-        bridge.runAndCapture(bridge.buildBattleArgs(planOptsB), 600_000, bridge.buildBattleStdin(planOptsB), tempDirB),
-      ]);
+      const planDirA = mkdtempSync(join(tmpdir(), 'miyagi-plan-'));
+      const planDirB = mkdtempSync(join(tmpdir(), 'miyagi-plan-'));
+
+      let rawPlanA: string;
+      let rawPlanB: string;
+      try {
+        [rawPlanA, rawPlanB] = await Promise.all([
+          bridge.runAndCapture(bridge.buildBattleArgs(planOptsA), 120_000, bridge.buildBattleStdin(planOptsA), planDirA),
+          bridge.runAndCapture(bridge.buildBattleArgs(planOptsB), 120_000, bridge.buildBattleStdin(planOptsB), planDirB),
+        ]);
+      } finally {
+        rmSync(planDirA, { recursive: true, force: true });
+        rmSync(planDirB, { recursive: true, force: true });
+      }
 
       const planA = parsePlan(rawPlanA);
       const planB = parsePlan(rawPlanB);
@@ -209,14 +219,17 @@ export class BattleEngine {
         if (onProgress) onProgress({ phase: 'round', type: 'info', agent: config.agentA, round });
         if (onProgress) onProgress({ phase: 'round', type: 'info', agent: config.agentB, round });
 
-        const startA = Date.now();
-        const startB = Date.now();
-        const [rawResponseA, rawResponseB] = await Promise.all([
-          bridge.runAndCapture(bridge.buildBattleArgs(optsA), 600_000, bridge.buildBattleStdin(optsA), tempDirA),
-          bridge.runAndCapture(bridge.buildBattleArgs(optsB), 600_000, bridge.buildBattleStdin(optsB), tempDirB),
+        const startTime = Date.now();
+        const [resultA, resultB] = await Promise.all([
+          bridge.runAndCapture(bridge.buildBattleArgs(optsA), 600_000, bridge.buildBattleStdin(optsA), tempDirA)
+            .then(r => ({ response: r, elapsedMs: Date.now() - startTime })),
+          bridge.runAndCapture(bridge.buildBattleArgs(optsB), 600_000, bridge.buildBattleStdin(optsB), tempDirB)
+            .then(r => ({ response: r, elapsedMs: Date.now() - startTime })),
         ]);
-        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentA, round, elapsedMs: Date.now() - startA, message: rawResponseA });
-        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentB, round, elapsedMs: Date.now() - startB, message: rawResponseB });
+        const rawResponseA = resultA.response;
+        const rawResponseB = resultB.response;
+        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentA, round, elapsedMs: resultA.elapsedMs, message: rawResponseA });
+        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentB, round, elapsedMs: resultB.elapsedMs, message: rawResponseB });
 
         rounds.push({ round, agentAResponse: rawResponseA, agentBResponse: rawResponseB, timestamp: new Date().toISOString() });
       }
