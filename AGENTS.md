@@ -59,13 +59,14 @@ Each directory is an independent area. Agents working on one area should not nee
 **Tests:** `tests/unit/config.test.ts`, `agent-manager.test.ts`, `skill-manager.test.ts`, `session-manager.test.ts`, `claude-bridge.test.ts`, `impersonation.test.ts`, `core-edge-cases.test.ts`, `template-install-create.test.ts`
 
 ### `src/battle/` — Battle System
-- `engine.ts` — BattleEngine: creates configs, assembles results, validates modes. Runs agents in isolated temp directories (`/tmp/miyagi-battle-*`) with `--dangerously-skip-permissions` so agents can write and execute code. Persistent workspaces across rounds (agents build on their work). Collects generated files (up to 30KB) from the final workspace state and appends to the last round response. 10-minute timeout per agent call. Cleanup via `finally` blocks.
+- `engine.ts` — BattleEngine: creates configs, assembles results, validates modes. Runs agents in isolated temp directories (`/tmp/miyagi-battle-*`) with `--dangerously-skip-permissions` so agents can write and execute code. Persistent workspaces across rounds (agents build on their work). Collects generated files (up to 30KB) from the final workspace state and appends to the last round response. 10-minute timeout per agent call. Cleanup via `finally` blocks. Symmetric battles include a planning phase (round 0) before execution rounds.
+- `planner.ts` — BattlePlanner: pure functions for the planning phase. `parsePlan()` extracts deliverable/approach/steps from Markdown. `mapStepsToRounds()` distributes steps via balanced `floor(N/M) + remainder` heuristic to avoid empty rounds. `buildPlanningPrompt()` generates round 0 prompt with deliverable disambiguation. `buildExecutionPrompt()` generates per-round directed prompts.
 - `mediator.ts` — BattleMediator: turn-by-turn asymmetric battles, role prompts, termination detection
 - `modes/` — 10 mode config files + `index.ts` registry
 - `background.ts` — Background battle launcher: `launchBackground()` spawns detached child process, `getBattleStatus()` detects status via PID liveness and file presence, `getBattleInfo()` and `listBattles()` for querying battle state from `~/.miyagi/battles/`
 - `runner.ts` — Background battle runner: `runBattleBackground()` reads config from disk, executes full pipeline (engine → judge → coach → save), writes progress.jsonl, result.json, verdict.json, cleans up PID file
 
-**Tests:** `tests/unit/battle-engine.test.ts`, `battle-mediator.test.ts`, `battle-modes.test.ts`, `battle-edge-cases.test.ts`, `battle-temp-dirs.test.ts`, `background-launcher.test.ts`, `battle-runner.test.ts`
+**Tests:** `tests/unit/battle-engine.test.ts`, `battle-mediator.test.ts`, `battle-modes.test.ts`, `battle-edge-cases.test.ts`, `battle-temp-dirs.test.ts`, `battle-planner.test.ts`, `background-launcher.test.ts`, `battle-runner.test.ts`
 
 ### `src/training/` — Judge, Coach, Scoring
 - `judge.ts` — Judge: builds evaluation prompts with task verification requirements, parses JudgeVerdict from LLM JSON. Uses "contestant" terminology to avoid role confusion. Instructs judge to verify actual generated files against agent claims. Retry logic (2 attempts).

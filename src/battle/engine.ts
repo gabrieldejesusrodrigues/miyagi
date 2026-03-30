@@ -53,6 +53,7 @@ import type { AgentManager } from '../core/agent-manager.js';
 import type { ClaudeBridge } from '../core/claude-bridge.js';
 import { BattleMediator } from './mediator.js';
 import { getModeConfig } from './modes/index.js';
+import { parsePlan, mapStepsToRounds, buildPlanningPrompt, buildExecutionPrompt } from './planner.js';
 
 const VALID_MODES: Set<string> = new Set([
   'same-task', 'code-challenge', 'iterative-refinement', 'speed-run',
@@ -135,42 +136,100 @@ export class BattleEngine {
     const identityB = readFileSync(agentB.identityPath, 'utf-8');
 
     const rounds: BattleRound[] = [];
+    const modeConfig = getModeConfig(config.mode);
+    const taskLabel = config.task ?? config.topic ?? 'Complete the task.';
 
     // Persistent workspace per agent — files accumulate across rounds
     const tempDirA = mkdtempSync(join(tmpdir(), 'miyagi-battle-'));
     const tempDirB = mkdtempSync(join(tmpdir(), 'miyagi-battle-'));
 
     try {
+      // Phase 0: Planning
+      if (onProgress) onProgress({ phase: 'setup', type: 'info', message: 'Planning phase' });
+
+      const planningPrompt = buildPlanningPrompt(taskLabel, modeConfig.name, modeConfig.description, config.maxRounds);
+      const planOptsA = { systemPrompt: identityA, prompt: planningPrompt, effort, dangerouslySkipPermissions: true };
+      const planOptsB = { systemPrompt: identityB, prompt: planningPrompt, effort, dangerouslySkipPermissions: true };
+
+      const planDirA = mkdtempSync(join(tmpdir(), 'miyagi-plan-'));
+      const planDirB = mkdtempSync(join(tmpdir(), 'miyagi-plan-'));
+
+      let rawPlanA: string;
+      let rawPlanB: string;
+      try {
+        [rawPlanA, rawPlanB] = await Promise.all([
+          bridge.runAndCapture(bridge.buildBattleArgs(planOptsA), 120_000, bridge.buildBattleStdin(planOptsA), planDirA),
+          bridge.runAndCapture(bridge.buildBattleArgs(planOptsB), 120_000, bridge.buildBattleStdin(planOptsB), planDirB),
+        ]);
+      } finally {
+        rmSync(planDirA, { recursive: true, force: true });
+        rmSync(planDirB, { recursive: true, force: true });
+      }
+
+      const planA = parsePlan(rawPlanA);
+      const planB = parsePlan(rawPlanB);
+
+      const hasPlanA = planA.steps.length > 0;
+      const hasPlanB = planB.steps.length > 0;
+
+      const roundAssignmentsA = hasPlanA ? mapStepsToRounds(planA.steps, config.maxRounds) : [];
+      const roundAssignmentsB = hasPlanB ? mapStepsToRounds(planB.steps, config.maxRounds) : [];
+
+      // Phase 1-N: Execution
       for (let round = 1; round <= config.maxRounds; round++) {
-        const taskLabel = config.task ?? config.topic ?? 'Complete the task.';
         if (onProgress) onProgress({ phase: 'round', type: 'start', round, totalRounds: config.maxRounds, message: taskLabel });
 
-        let taskPrompt: string;
-        if (round === 1) {
-          taskPrompt = taskLabel;
+        const previousOutputsA = round > 1 ? rounds[round - 2].agentAResponse : undefined;
+        const previousOutputsB = round > 1 ? rounds[round - 2].agentBResponse : undefined;
+
+        let taskPromptA: string;
+        let taskPromptB: string;
+
+        if (hasPlanA) {
+          taskPromptA = buildExecutionPrompt({
+            taskLabel,
+            plan: planA,
+            assignedSteps: roundAssignmentsA[round - 1] ?? [],
+            round,
+            maxRounds: config.maxRounds,
+            previousOutputs: previousOutputsA,
+          });
         } else {
-          const prev = rounds[round - 2];
-          taskPrompt = `${taskLabel}\n\n` +
-            `Previous round output:\n` +
-            `${config.agentA}: ${prev.agentAResponse}\n` +
-            `${config.agentB}: ${prev.agentBResponse}\n\n` +
-            `Continue and improve on the above.`;
+          taskPromptA = round === 1 ? taskLabel :
+            `${taskLabel}\n\nPrevious round output:\n${config.agentA}: ${rounds[round - 2].agentAResponse}\n${config.agentB}: ${rounds[round - 2].agentBResponse}\n\nContinue and improve on the above.`;
         }
 
-        const optsA = { systemPrompt: identityA, prompt: taskPrompt, effort, dangerouslySkipPermissions: true };
-        const optsB = { systemPrompt: identityB, prompt: taskPrompt, effort, dangerouslySkipPermissions: true };
+        if (hasPlanB) {
+          taskPromptB = buildExecutionPrompt({
+            taskLabel,
+            plan: planB,
+            assignedSteps: roundAssignmentsB[round - 1] ?? [],
+            round,
+            maxRounds: config.maxRounds,
+            previousOutputs: previousOutputsB,
+          });
+        } else {
+          taskPromptB = round === 1 ? taskLabel :
+            `${taskLabel}\n\nPrevious round output:\n${config.agentA}: ${rounds[round - 2].agentAResponse}\n${config.agentB}: ${rounds[round - 2].agentBResponse}\n\nContinue and improve on the above.`;
+        }
+
+        const optsA = { systemPrompt: identityA, prompt: taskPromptA, effort, dangerouslySkipPermissions: true };
+        const optsB = { systemPrompt: identityB, prompt: taskPromptB, effort, dangerouslySkipPermissions: true };
 
         if (onProgress) onProgress({ phase: 'round', type: 'info', agent: config.agentA, round });
         if (onProgress) onProgress({ phase: 'round', type: 'info', agent: config.agentB, round });
 
-        const startA = Date.now();
-        const startB = Date.now();
-        const [rawResponseA, rawResponseB] = await Promise.all([
-          bridge.runAndCapture(bridge.buildBattleArgs(optsA), 600_000, bridge.buildBattleStdin(optsA), tempDirA),
-          bridge.runAndCapture(bridge.buildBattleArgs(optsB), 600_000, bridge.buildBattleStdin(optsB), tempDirB),
+        const startTime = Date.now();
+        const [resultA, resultB] = await Promise.all([
+          bridge.runAndCapture(bridge.buildBattleArgs(optsA), 600_000, bridge.buildBattleStdin(optsA), tempDirA)
+            .then(r => ({ response: r, elapsedMs: Date.now() - startTime })),
+          bridge.runAndCapture(bridge.buildBattleArgs(optsB), 600_000, bridge.buildBattleStdin(optsB), tempDirB)
+            .then(r => ({ response: r, elapsedMs: Date.now() - startTime })),
         ]);
-        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentA, round, elapsedMs: Date.now() - startA, message: rawResponseA });
-        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentB, round, elapsedMs: Date.now() - startB, message: rawResponseB });
+        const rawResponseA = resultA.response;
+        const rawResponseB = resultB.response;
+        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentA, round, elapsedMs: resultA.elapsedMs, message: rawResponseA });
+        if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentB, round, elapsedMs: resultB.elapsedMs, message: rawResponseB });
 
         rounds.push({ round, agentAResponse: rawResponseA, agentBResponse: rawResponseB, timestamp: new Date().toISOString() });
       }
@@ -183,12 +242,15 @@ export class BattleEngine {
         lastRound.agentAResponse += filesA;
         lastRound.agentBResponse += filesB;
       }
+
+      const result = this.assembleResult(config, rounds, 'round-limit');
+      if (hasPlanA) result.planA = planA;
+      if (hasPlanB) result.planB = planB;
+      return result;
     } finally {
       rmSync(tempDirA, { recursive: true, force: true });
       rmSync(tempDirB, { recursive: true, force: true });
     }
-
-    return this.assembleResult(config, rounds, 'round-limit');
   }
 
   async runAsymmetric(

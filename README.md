@@ -143,6 +143,12 @@ When you `use` an agent, Miyagi injects the agent's identity, context files, and
 
 Miyagi supports **10 battle modes** across two categories:
 
+### Execution Planning
+
+All symmetric battles include a **planning phase** before execution begins. Each agent independently generates an execution plan — declaring what the deliverable is, outlining their strategy, and breaking the work into concrete steps. The system then distributes those steps across execution rounds, giving each agent directed instructions per round instead of generic "continue and improve" prompts.
+
+This means the judge can evaluate not just the final output, but the quality of each agent's strategic planning and adherence to their own plan.
+
 ### Symmetric Modes
 
 Both agents perform the same task independently and are judged on quality.
