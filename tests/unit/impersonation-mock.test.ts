@@ -1,10 +1,43 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, lstatSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, lstatSync, readdirSync, symlinkSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { ConfigManager } from '../../src/core/config.js';
 import { AgentManager } from '../../src/core/agent-manager.js';
 import { ImpersonationManager } from '../../src/core/impersonation.js';
+import type { ProviderBridge } from '../../src/core/providers/types.js';
+
+function createTestBridge(claudeSkillsDir: string): ProviderBridge {
+  const activeSymlinks: string[] = [];
+  return {
+    provider: 'claude',
+    findBinaryPath: () => 'echo',
+    buildSessionArgs: () => [],
+    buildBattleArgs: () => [],
+    buildBattleStdin: () => '',
+    spawnInteractive: () => { throw new Error('not implemented'); },
+    spawnNonInteractive: () => { throw new Error('not implemented'); },
+    runAndCapture: async () => '',
+    setupSkills: async (agentName: string, skillsDir: string) => {
+      if (!existsSync(skillsDir)) return;
+      for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const skillPath = join(skillsDir, entry.name);
+        const symlinkName = `miyagi-${agentName}-${entry.name}`;
+        const symlinkPath = join(claudeSkillsDir, symlinkName);
+        if (existsSync(symlinkPath)) unlinkSync(symlinkPath);
+        symlinkSync(skillPath, symlinkPath);
+        activeSymlinks.push(symlinkPath);
+      }
+    },
+    cleanupSkills: async () => {
+      for (const symlinkPath of activeSymlinks) {
+        if (existsSync(symlinkPath)) unlinkSync(symlinkPath);
+      }
+      activeSymlinks.length = 0;
+    },
+  } as ProviderBridge;
+}
 
 describe('ImpersonationManager', () => {
   let tmpDir: string;
@@ -12,6 +45,7 @@ describe('ImpersonationManager', () => {
   let config: ConfigManager;
   let agentManager: AgentManager;
   let impersonation: ImpersonationManager;
+  let bridge: ProviderBridge;
 
   beforeEach(async () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'miyagi-imp-test-'));
@@ -20,7 +54,8 @@ describe('ImpersonationManager', () => {
     config = new ConfigManager(tmpDir);
     config.ensureDirectories();
     agentManager = new AgentManager(config);
-    impersonation = new ImpersonationManager(agentManager, claudeSkillsDir);
+    impersonation = new ImpersonationManager(agentManager);
+    bridge = createTestBridge(claudeSkillsDir);
   });
 
   afterEach(async () => {
@@ -39,7 +74,7 @@ describe('ImpersonationManager', () => {
         '---\nname: test\ndescription: test skill\n---\nContent',
       );
 
-      await impersonation.activate('test-agent');
+      await impersonation.activate('test-agent', bridge);
 
       const symlinkPath = join(claudeSkillsDir, 'miyagi-test-agent-test-skill');
       expect(existsSync(symlinkPath)).toBe(true);
@@ -56,7 +91,7 @@ describe('ImpersonationManager', () => {
         '---\nname: test\ndescription: test\n---\nContent',
       );
 
-      await impersonation.activate('test-agent');
+      await impersonation.activate('test-agent', bridge);
       await impersonation.deactivate();
 
       const symlinkPath = join(claudeSkillsDir, 'miyagi-test-agent-test-skill');
@@ -64,12 +99,12 @@ describe('ImpersonationManager', () => {
     });
 
     it('should throw for nonexistent agent', async () => {
-      await expect(impersonation.activate('nonexistent')).rejects.toThrow('not found');
+      await expect(impersonation.activate('nonexistent', bridge)).rejects.toThrow('not found');
     });
 
     it('should handle agent with no skills', async () => {
       await agentManager.create('no-skills', { author: 'test' });
-      await impersonation.activate('no-skills');
+      await impersonation.activate('no-skills', bridge);
       // Should not throw
       await impersonation.deactivate();
     });

@@ -1,46 +1,29 @@
-import { existsSync, symlinkSync, unlinkSync, readFileSync, readdirSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import type { AgentManager } from './agent-manager.js';
+import type { ProviderBridge } from './providers/types.js';
 
 export class ImpersonationManager {
   private readonly agentManager: AgentManager;
-  private readonly claudeSkillsDir: string;
-  private activeSymlinks: string[] = [];
-  private activeAgent: string | null = null;
+  private activeBridge: ProviderBridge | null = null;
 
-  constructor(agentManager: AgentManager, claudeSkillsDir: string) {
+  constructor(agentManager: AgentManager) {
     this.agentManager = agentManager;
-    this.claudeSkillsDir = claudeSkillsDir;
   }
 
-  async activate(agentName: string): Promise<void> {
+  async activate(agentName: string, bridge: ProviderBridge): Promise<void> {
     const agent = await this.agentManager.get(agentName);
     if (!agent) throw new Error(`Agent "${agentName}" not found`);
 
-    if (existsSync(agent.skillsDir)) {
-      for (const entry of readdirSync(agent.skillsDir, { withFileTypes: true })) {
-        if (!entry.isDirectory()) continue;
-        const skillPath = join(agent.skillsDir, entry.name);
-        const symlinkName = `miyagi-${agentName}-${entry.name}`;
-        const symlinkPath = join(this.claudeSkillsDir, symlinkName);
-
-        if (existsSync(symlinkPath)) unlinkSync(symlinkPath);
-        symlinkSync(skillPath, symlinkPath);
-        this.activeSymlinks.push(symlinkPath);
-      }
-    }
-
-    this.activeAgent = agentName;
+    await bridge.setupSkills(agentName, agent.skillsDir);
+    this.activeBridge = bridge;
   }
 
   async deactivate(): Promise<void> {
-    for (const symlinkPath of this.activeSymlinks) {
-      if (existsSync(symlinkPath)) {
-        unlinkSync(symlinkPath);
-      }
+    if (this.activeBridge) {
+      await this.activeBridge.cleanupSkills();
+      this.activeBridge = null;
     }
-    this.activeSymlinks = [];
-    this.activeAgent = null;
   }
 
   async buildSystemPrompt(agentName: string): Promise<string> {

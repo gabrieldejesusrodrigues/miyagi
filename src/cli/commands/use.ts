@@ -2,24 +2,23 @@ import type { Command } from 'commander';
 import { ConfigManager } from '../../core/config.js';
 import { AgentManager } from '../../core/agent-manager.js';
 import { ImpersonationManager } from '../../core/impersonation.js';
-import { ClaudeBridge } from '../../core/claude-bridge.js';
+import { createBridge } from '../../core/providers/factory.js';
+import { resolveModel } from '../../types/provider.js';
 import { SessionManager } from '../../core/session-manager.js';
-import { homedir } from 'os';
-import { join } from 'path';
 
 export function registerUseCommand(program: Command): void {
   program
     .command('use')
     .argument('<agent>', 'Agent to impersonate')
     .option('-r, --resume [sessionId]', 'Resume a previous session')
+    .option('--model <model>', 'Model to use (provider/model format, e.g., gemini/gemini-2.5-pro)')
     .description('Start a Claude Code session as an agent')
     .action(async (agentName, options) => {
       const config = new ConfigManager();
       config.ensureDirectories();
+      const globalConfig = config.load();
       const agentManager = new AgentManager(config, process.cwd());
-      const claudeSkillsDir = join(homedir(), '.claude', 'commands');
-      const impersonation = new ImpersonationManager(agentManager, claudeSkillsDir);
-      const bridge = new ClaudeBridge();
+      const impersonation = new ImpersonationManager(agentManager);
       const sessionManager = new SessionManager(config.root);
 
       const agent = await agentManager.get(agentName);
@@ -28,8 +27,12 @@ export function registerUseCommand(program: Command): void {
         process.exit(1);
       }
 
-      // Activate skill symlinks
-      await impersonation.activate(agentName);
+      // Resolve model: CLI flag > manifest > global config > default
+      const modelSpec = resolveModel(options.model, agent.manifest, globalConfig);
+      const bridge = createBridge(modelSpec);
+
+      // Activate skill symlinks via the provider bridge
+      await impersonation.activate(agentName, bridge);
       impersonation.setupCleanupTraps();
 
       // Build system prompt
@@ -38,18 +41,15 @@ export function registerUseCommand(program: Command): void {
       // Build args
       const sessionArgs = bridge.buildSessionArgs({
         systemPrompt,
+        model: modelSpec.model,
         resumeSession: typeof options.resume === 'string' ? options.resume : (options.resume !== undefined ? 'latest' : undefined),
       });
 
-      // Collect any claude pass-through flags from parent
-      const parentOpts = program.opts();
-      if (parentOpts.model) sessionArgs.push('--model', parentOpts.model);
-
-      console.log(`Starting session as ${agentName}...`);
+      console.log(`Starting session as ${agentName} (${modelSpec.provider}/${modelSpec.model})...`);
 
       const sessionEntry = sessionManager.record(agentName, options.resume && typeof options.resume === 'string' ? options.resume : agentName + '-' + Date.now());
 
-      // Spawn interactive claude
+      // Spawn interactive session via the provider bridge
       const child = bridge.spawnInteractive(sessionArgs);
 
       child.on('close', async (code) => {
