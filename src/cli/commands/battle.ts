@@ -57,8 +57,8 @@ export function registerBattleCommand(program: Command): void {
         const modeConfig = getModeConfig(mode);
         const battleConfig = engine.createConfig({
           agentA: agent1, agentB: agent2, mode,
-          modelA: options.modelA ?? options.model ?? agentA.manifest.model,
-          modelB: options.modelB ?? options.model ?? agentB.manifest.model,
+          modelA: `${specA.provider}/${specA.model}`,
+          modelB: `${specB.provider}/${specB.model}`,
           task: options.task, topic: options.topic,
           maxRounds: options.rounds ?? modeConfig.defaultRounds,
           background: true,
@@ -81,8 +81,8 @@ export function registerBattleCommand(program: Command): void {
           agentA: agent1,
           agentB: agent2,
           mode,
-          modelA: options.modelA ?? options.model ?? agentA.manifest.model,
-          modelB: options.modelB ?? options.model ?? agentB.manifest.model,
+          modelA: `${specA.provider}/${specA.model}`,
+          modelB: `${specB.provider}/${specB.model}`,
           task: options.task,
           topic: options.topic,
           maxRounds: options.rounds ?? modeConfig.defaultRounds,

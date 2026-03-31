@@ -11,12 +11,10 @@ function createTestBridge(claudeSkillsDir: string): ProviderBridge {
   const activeSymlinks: string[] = [];
   return {
     provider: 'claude',
-    findBinaryPath: () => 'echo',
     buildSessionArgs: () => [],
     buildBattleArgs: () => [],
     buildBattleStdin: () => '',
     spawnInteractive: () => { throw new Error('not implemented'); },
-    spawnNonInteractive: () => { throw new Error('not implemented'); },
     runAndCapture: async () => '',
     setupSkills: async (agentName: string, skillsDir: string) => {
       if (!existsSync(skillsDir)) return;

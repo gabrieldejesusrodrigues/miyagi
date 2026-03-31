@@ -2,7 +2,8 @@ import { writeFileSync, readFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { spawn } from 'child_process';
-import { ClaudeBridge } from './claude-bridge.js';
+import { createBridge } from './providers/factory.js';
+import type { ProviderBridge } from './providers/types.js';
 
 export interface AgentAnswers {
   description: string;
@@ -66,10 +67,10 @@ const UNCERTAINTY_CHOICES = [
 ];
 
 export class InteractiveCreator {
-  private bridge: ClaudeBridge;
+  private bridge: ProviderBridge;
 
-  constructor(bridge?: ClaudeBridge) {
-    this.bridge = bridge ?? new ClaudeBridge();
+  constructor(bridge?: ProviderBridge) {
+    this.bridge = bridge ?? createBridge();
   }
 
   async gatherInput(): Promise<AgentAnswers> {

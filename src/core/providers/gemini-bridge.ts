@@ -1,7 +1,7 @@
 import { spawn, execSync, type ChildProcess } from 'child_process';
 import { existsSync, writeFileSync, unlinkSync, readdirSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { homedir, tmpdir } from 'os';
+import { homedir } from 'os';
 import type { ProviderBridge } from './types.js';
 import type { SessionOptions, BattleAgentOptions } from '../../types/provider.js';
 
@@ -9,7 +9,6 @@ export class GeminiBridge implements ProviderBridge {
   readonly provider = 'gemini' as const;
   private binaryPath: string;
   private activeSkillFiles: string[] = [];
-  private tempSystemPromptFile: string | null = null;
 
   constructor(binaryPath?: string) {
     this.binaryPath = binaryPath ?? this.findBinaryPath();
@@ -64,6 +63,8 @@ export class GeminiBridge implements ProviderBridge {
       args.push('--approval-mode', 'yolo');
     }
 
+    // Gemini CLI does not support --effort; the parameter is intentionally not forwarded.
+
     // -p flag forces non-interactive mode.
     // Stdin content is prepended to the -p argument value.
     // We pass an empty -p so the full prompt comes from stdin.
@@ -81,27 +82,6 @@ export class GeminiBridge implements ProviderBridge {
     }
     input += opts.prompt;
     return input;
-  }
-
-  /**
-   * Build environment variables for the subprocess.
-   * Uses GEMINI_SYSTEM_MD to inject system prompt via a temp file
-   * when running in non-interactive (battle) mode.
-   */
-  private buildEnv(systemPrompt?: string, cwd?: string): Record<string, string | undefined> {
-    const env = { ...process.env };
-
-    if (systemPrompt) {
-      // Write system prompt to a temp file and point GEMINI_SYSTEM_MD at it.
-      // This is the official mechanism for system prompt injection in Gemini CLI.
-      const tempDir = cwd ?? tmpdir();
-      const systemPromptPath = join(tempDir, '.miyagi-gemini-system.md');
-      writeFileSync(systemPromptPath, systemPrompt);
-      env['GEMINI_SYSTEM_MD'] = systemPromptPath;
-      this.tempSystemPromptFile = systemPromptPath;
-    }
-
-    return env;
   }
 
   spawnInteractive(args: string[]): ChildProcess {
@@ -141,11 +121,6 @@ export class GeminiBridge implements ProviderBridge {
 
       child.on('close', (code) => {
         clearTimeout(timer);
-        // Clean up temp system prompt file if created
-        if (this.tempSystemPromptFile && existsSync(this.tempSystemPromptFile)) {
-          try { unlinkSync(this.tempSystemPromptFile); } catch { /* ignore */ }
-          this.tempSystemPromptFile = null;
-        }
         if (killed) {
           reject(new Error(`Gemini process timed out after ${timeout}ms`));
         } else if (code === 0) {

@@ -60,6 +60,8 @@ export class CodexBridge implements ProviderBridge {
       args.push('--yolo');
     }
 
+    // Codex CLI does not support --effort; the parameter is intentionally not forwarded.
+
     // System prompt via -c instructions="..."
     if (opts.systemPrompt) {
       args.push('-c', `instructions=${JSON.stringify(opts.systemPrompt)}`);

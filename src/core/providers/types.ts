@@ -4,14 +4,11 @@ import type { ProviderName, SessionOptions, BattleAgentOptions } from '../../typ
 export interface ProviderBridge {
   readonly provider: ProviderName;
 
-  findBinaryPath(): string;
-
   buildSessionArgs(opts: SessionOptions): string[];
   buildBattleArgs(opts: BattleAgentOptions): string[];
   buildBattleStdin(opts: BattleAgentOptions): string;
 
   spawnInteractive(args: string[]): ChildProcess;
-  spawnNonInteractive(args: string[], cwd?: string): ChildProcess;
   runAndCapture(args: string[], timeout?: number, stdinData?: string, cwd?: string): Promise<string>;
 
   setupSkills(agentName: string, skillsDir: string): Promise<void>;
