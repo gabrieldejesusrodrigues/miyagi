@@ -51,6 +51,7 @@ import type {
 } from '../types/index.js';
 import type { AgentManager } from '../core/agent-manager.js';
 import type { ProviderBridge } from '../core/providers/types.js';
+import { parseModelSpec } from '../types/provider.js';
 import { BattleMediator } from './mediator.js';
 import { getModeConfig } from './modes/index.js';
 import { parsePlan, mapStepsToRounds, buildPlanningPrompt, buildExecutionPrompt } from './planner.js';
@@ -140,6 +141,10 @@ export class BattleEngine {
     const identityA = readFileSync(agentA.identityPath, 'utf-8');
     const identityB = readFileSync(agentB.identityPath, 'utf-8');
 
+    // Extract model names from config to forward to subprocess
+    const modelA = config.modelA ? parseModelSpec(config.modelA).model : undefined;
+    const modelB = config.modelB ? parseModelSpec(config.modelB).model : undefined;
+
     const rounds: BattleRound[] = [];
     const modeConfig = getModeConfig(config.mode);
     const taskLabel = config.task ?? config.topic ?? 'Complete the task.';
@@ -153,8 +158,8 @@ export class BattleEngine {
       if (onProgress) onProgress({ phase: 'setup', type: 'info', message: 'Planning phase' });
 
       const planningPrompt = buildPlanningPrompt(taskLabel, modeConfig.name, modeConfig.description, config.maxRounds);
-      const planOptsA = { systemPrompt: identityA, prompt: planningPrompt, effort, dangerouslySkipPermissions: true };
-      const planOptsB = { systemPrompt: identityB, prompt: planningPrompt, effort, dangerouslySkipPermissions: true };
+      const planOptsA = { systemPrompt: identityA, prompt: planningPrompt, effort, model: modelA, dangerouslySkipPermissions: true };
+      const planOptsB = { systemPrompt: identityB, prompt: planningPrompt, effort, model: modelB, dangerouslySkipPermissions: true };
 
       const planDirA = mkdtempSync(join(tmpdir(), 'miyagi-plan-'));
       const planDirB = mkdtempSync(join(tmpdir(), 'miyagi-plan-'));
@@ -218,8 +223,8 @@ export class BattleEngine {
             `${taskLabel}\n\nPrevious round output:\n${config.agentA}: ${rounds[round - 2].agentAResponse}\n${config.agentB}: ${rounds[round - 2].agentBResponse}\n\nContinue and improve on the above.`;
         }
 
-        const optsA = { systemPrompt: identityA, prompt: taskPromptA, effort, dangerouslySkipPermissions: true };
-        const optsB = { systemPrompt: identityB, prompt: taskPromptB, effort, dangerouslySkipPermissions: true };
+        const optsA = { systemPrompt: identityA, prompt: taskPromptA, effort, model: modelA, dangerouslySkipPermissions: true };
+        const optsB = { systemPrompt: identityB, prompt: taskPromptB, effort, model: modelB, dangerouslySkipPermissions: true };
 
         if (onProgress) onProgress({ phase: 'round', type: 'info', agent: config.agentA, round });
         if (onProgress) onProgress({ phase: 'round', type: 'info', agent: config.agentB, round });
@@ -274,6 +279,9 @@ export class BattleEngine {
     const identityA = readFileSync(agentA.identityPath, 'utf-8');
     const identityB = readFileSync(agentB.identityPath, 'utf-8');
 
+    const modelA = config.modelA ? parseModelSpec(config.modelA).model : undefined;
+    const modelB = config.modelB ? parseModelSpec(config.modelB).model : undefined;
+
     const mediator = new BattleMediator();
     const modeConfig = getModeConfig(config.mode);
     const rolePrompts = mediator.buildRolePrompts(modeConfig, config.topic ?? config.task);
@@ -291,7 +299,7 @@ export class BattleEngine {
         if (onProgress) onProgress({ phase: 'round', type: 'start', round, totalRounds: config.maxRounds, message: taskLabel });
 
         const turnPromptA = mediator.buildTurnPrompt(rolePrompts.agentA, history, round, config.maxRounds);
-        const optsA = { systemPrompt: identityA, prompt: turnPromptA, effort, dangerouslySkipPermissions: true };
+        const optsA = { systemPrompt: identityA, prompt: turnPromptA, effort, model: modelA, dangerouslySkipPermissions: true };
         if (onProgress) onProgress({ phase: 'round', type: 'info', agent: config.agentA, round });
         const startA = Date.now();
         const rawResponseA = await bridgeA.runAndCapture(
@@ -308,7 +316,7 @@ export class BattleEngine {
         }
 
         const turnPromptB = mediator.buildTurnPrompt(rolePrompts.agentB, history, round, config.maxRounds);
-        const asymOptsB = { systemPrompt: identityB, prompt: turnPromptB, effort, dangerouslySkipPermissions: true };
+        const asymOptsB = { systemPrompt: identityB, prompt: turnPromptB, effort, model: modelB, dangerouslySkipPermissions: true };
         if (onProgress) onProgress({ phase: 'round', type: 'info', agent: config.agentB, round });
         const startB = Date.now();
         const rawResponseB = await bridgeB.runAndCapture(

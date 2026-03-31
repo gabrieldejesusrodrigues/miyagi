@@ -182,7 +182,7 @@ export function registerBattleCommand(program: Command): void {
         history.saveBattleData(config.reportsDir, battleConfig.id, result, verdict);
 
         // Auto-train both agents — coach uses its own bridge from config
-        const coachSpec = parseModelSpec(globalConfig.coach?.model);
+        const coachSpec = parseModelSpec(globalConfig.coach?.model ?? 'claude/sonnet');
         const coachBridge = createBridge(coachSpec);
         const coach = new Coach(agentManager);
 

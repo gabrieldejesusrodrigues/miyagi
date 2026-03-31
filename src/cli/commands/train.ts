@@ -61,7 +61,7 @@ export function registerTrainCommand(program: Command): void {
         const agentFiles = await coach.getAgentFiles(agentName);
 
         // Resolve coach bridge from config
-        const coachSpec = parseModelSpec(globalConfig.coach?.model);
+        const coachSpec = parseModelSpec(globalConfig.coach?.model ?? 'claude/sonnet');
         const bridge = createBridge(coachSpec);
         const coachIdentity = coach.getIdentity();
 

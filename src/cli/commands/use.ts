@@ -38,11 +38,19 @@ export function registerUseCommand(program: Command): void {
       // Build system prompt
       const systemPrompt = await impersonation.buildSystemPrompt(agentName);
 
+      // Collect pass-through flags from parent program options
+      const parentOpts = program.opts();
+      const extraArgs: string[] = [];
+      if (parentOpts.dangerouslySkipPermissions) extraArgs.push('--dangerously-skip-permissions');
+      if (parentOpts.effort) extraArgs.push('--effort', parentOpts.effort);
+      if (parentOpts.worktree) extraArgs.push('--worktree');
+
       // Build args
       const sessionArgs = bridge.buildSessionArgs({
         systemPrompt,
         model: modelSpec.model,
         resumeSession: typeof options.resume === 'string' ? options.resume : (options.resume !== undefined ? 'latest' : undefined),
+        extraArgs: extraArgs.length > 0 ? extraArgs : undefined,
       });
 
       console.log(`Starting session as ${agentName} (${modelSpec.provider}/${modelSpec.model})...`);

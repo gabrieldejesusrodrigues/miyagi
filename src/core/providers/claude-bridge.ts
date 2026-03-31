@@ -1,5 +1,5 @@
 import { spawn, execSync, type ChildProcess } from 'child_process';
-import { existsSync, symlinkSync, unlinkSync, readdirSync } from 'fs';
+import { existsSync, symlinkSync, unlinkSync, readdirSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import type { ProviderBridge } from './types.js';
@@ -131,6 +131,7 @@ export class ClaudeBridge implements ProviderBridge {
     const claudeCommandsDir = join(homedir(), '.claude', 'commands');
 
     if (!existsSync(skillsDir)) return;
+    if (!existsSync(claudeCommandsDir)) mkdirSync(claudeCommandsDir, { recursive: true });
 
     for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;

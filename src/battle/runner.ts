@@ -98,7 +98,7 @@ export async function runBattleBackground(
     history.saveBattleData(configManager.reportsDir, battleConfig.id, result, verdict);
 
     // Auto-coach both agents — coach uses its own bridge from config
-    const coachSpec = parseModelSpec(globalConfig.coach?.model);
+    const coachSpec = parseModelSpec(globalConfig.coach?.model ?? 'claude/sonnet');
     const coachBridge = createBridge(coachSpec);
     const coach = new Coach(agentManager);
 
