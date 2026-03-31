@@ -38,8 +38,7 @@ export function registerUseCommand(program: Command): void {
       // Build args
       const sessionArgs = bridge.buildSessionArgs({
         systemPrompt,
-        resume: options.resume !== undefined,
-        sessionId: typeof options.resume === 'string' ? options.resume : undefined,
+        resumeSession: typeof options.resume === 'string' ? options.resume : (options.resume !== undefined ? 'latest' : undefined),
       });
 
       // Collect any claude pass-through flags from parent
