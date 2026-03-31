@@ -3,7 +3,8 @@ import { ConfigManager } from '../../core/config.js';
 import { AgentManager } from '../../core/agent-manager.js';
 import { BattleEngine } from '../../battle/engine.js';
 import { getModeConfig } from '../../battle/modes/index.js';
-import { ClaudeBridge } from '../../core/claude-bridge.js';
+import { createBridge } from '../../core/providers/factory.js';
+import { resolveModel, parseModelSpec } from '../../types/provider.js';
 import { Judge } from '../../training/judge.js';
 import { HistoryManager } from '../../training/history.js';
 import { Coach } from '../../training/coach.js';
@@ -23,6 +24,9 @@ export function registerBattleCommand(program: Command): void {
     .option('--topic <topic>', 'Topic (for debate mode)')
     .option('--rounds <rounds>', 'Max rounds', parseInt)
     .option('-e, --effort <level>', 'Effort level: low, medium, high, max', 'medium')
+    .option('--model <model>', 'Model for both agents (provider/model format)')
+    .option('--model-a <model>', 'Model for agent A (provider/model format)')
+    .option('--model-b <model>', 'Model for agent B (provider/model format)')
     .description('Start a battle between two agents')
     .action(async (agent1, agent2, options) => {
       if (!agent1 || !agent2) {
@@ -34,12 +38,17 @@ export function registerBattleCommand(program: Command): void {
       config.ensureDirectories();
       const agentManager = new AgentManager(config, process.cwd());
       const engine = new BattleEngine();
+      const globalConfig = config.load();
 
       // Validate agents exist
       const agentA = await agentManager.get(agent1);
       const agentB = await agentManager.get(agent2);
       if (!agentA) { console.error(`Agent "${agent1}" not found`); process.exit(1); }
       if (!agentB) { console.error(`Agent "${agent2}" not found`); process.exit(1); }
+
+      // Resolve models per agent: CLI flag > manifest > global config > default
+      const specA = resolveModel(options.modelA ?? options.model, agentA.manifest, globalConfig);
+      const specB = resolveModel(options.modelB ?? options.model, agentB.manifest, globalConfig);
 
       // Background mode — launch detached and return immediately
       if (options.background) {
@@ -48,6 +57,8 @@ export function registerBattleCommand(program: Command): void {
         const modeConfig = getModeConfig(mode);
         const battleConfig = engine.createConfig({
           agentA: agent1, agentB: agent2, mode,
+          modelA: options.modelA ?? options.model ?? agentA.manifest.model,
+          modelB: options.modelB ?? options.model ?? agentB.manifest.model,
           task: options.task, topic: options.topic,
           maxRounds: options.rounds ?? modeConfig.defaultRounds,
           background: true,
@@ -70,6 +81,8 @@ export function registerBattleCommand(program: Command): void {
           agentA: agent1,
           agentB: agent2,
           mode,
+          modelA: options.modelA ?? options.model ?? agentA.manifest.model,
+          modelB: options.modelB ?? options.model ?? agentB.manifest.model,
           task: options.task,
           topic: options.topic,
           maxRounds: options.rounds ?? modeConfig.defaultRounds,
@@ -79,8 +92,14 @@ export function registerBattleCommand(program: Command): void {
         console.log(`Battle: ${agent1} vs ${agent2}`);
         console.log(`Mode: ${mode} (${modeConfig.type})`);
         console.log(`Rounds: ${battleConfig.maxRounds}`);
+        console.log(`Agent A (${agent1}): ${specA.provider}/${specA.model}`);
+        console.log(`Agent B (${agent2}): ${specB.provider}/${specB.model}`);
         console.log(`Battle ID: ${battleConfig.id}`);
-        const bridge = new ClaudeBridge();
+
+        // Create per-agent bridges
+        const bridgeA = createBridge(specA);
+        const bridgeB = createBridge(specB);
+
         const history = new HistoryManager(agentManager);
 
         const onProgress: BattleProgressCallback = createProgressCallback();
@@ -88,8 +107,8 @@ export function registerBattleCommand(program: Command): void {
 
         const effort = options.effort as string;
         const result = modeConfig.type === 'symmetric'
-          ? await engine.runSymmetric(battleConfig, agentManager, bridge, effort, onProgress)
-          : await engine.runAsymmetric(battleConfig, agentManager, bridge, effort, onProgress);
+          ? await engine.runSymmetric(battleConfig, agentManager, bridgeA, bridgeB, effort, onProgress)
+          : await engine.runAsymmetric(battleConfig, agentManager, bridgeA, bridgeB, effort, onProgress);
 
         // Print round summaries
         console.log(`\n--- Battle Complete (${result.terminationReason}) ---`);
@@ -103,7 +122,10 @@ export function registerBattleCommand(program: Command): void {
           }
         }
 
-        // Judge evaluation
+        // Judge evaluation — uses its own bridge from config
+        const judgeSpec = parseModelSpec(globalConfig.judge?.model ?? 'claude/opus');
+        const judgeBridge = createBridge(judgeSpec);
+
         onProgress({ phase: 'judge', type: 'start' });
         const judgeStart = Date.now();
         const judge = new Judge();
@@ -111,15 +133,15 @@ export function registerBattleCommand(program: Command): void {
         const judgeOpts = {
           systemPrompt: judge.getIdentity(),
           prompt: evalPrompt,
-          model: 'opus',
+          model: judgeSpec.model,
           effort: ['high', 'max'].includes(effort) ? effort : 'medium',
         };
         let verdictRaw = '';
         let verdict!: JudgeVerdict;
         const maxRetries = 2;
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          verdictRaw = await bridge.runAndCapture(
-            bridge.buildBattleArgs(judgeOpts), 600_000, bridge.buildBattleStdin(judgeOpts),
+          verdictRaw = await judgeBridge.runAndCapture(
+            judgeBridge.buildBattleArgs(judgeOpts), 600_000, judgeBridge.buildBattleStdin(judgeOpts),
           );
           try {
             verdict = judge.parseVerdict(verdictRaw);
@@ -159,7 +181,9 @@ export function registerBattleCommand(program: Command): void {
         // Save full battle data for report generation
         history.saveBattleData(config.reportsDir, battleConfig.id, result, verdict);
 
-        // Auto-train both agents
+        // Auto-train both agents — coach uses its own bridge from config
+        const coachSpec = parseModelSpec(globalConfig.coach?.model);
+        const coachBridge = createBridge(coachSpec);
         const coach = new Coach(agentManager);
 
         for (const trainAgent of [agent1, agent2]) {
@@ -193,8 +217,8 @@ export function registerBattleCommand(program: Command): void {
             let coachingResult;
             const maxCoachRetries = 2;
             for (let attempt = 1; attempt <= maxCoachRetries; attempt++) {
-              const rawResponse = await bridge.runAndCapture(
-                bridge.buildBattleArgs(coachOpts), 600_000, bridge.buildBattleStdin(coachOpts),
+              const rawResponse = await coachBridge.runAndCapture(
+                coachBridge.buildBattleArgs(coachOpts), 600_000, coachBridge.buildBattleStdin(coachOpts),
               );
               try {
                 coachingResult = coach.parseCoachingResponse(rawResponse);

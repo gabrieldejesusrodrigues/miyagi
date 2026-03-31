@@ -50,7 +50,7 @@ import type {
   BattleConfig, BattleMode, BattleRound, BattleResult, BattleProgressCallback,
 } from '../types/index.js';
 import type { AgentManager } from '../core/agent-manager.js';
-import type { ClaudeBridge } from '../core/claude-bridge.js';
+import type { ProviderBridge } from '../core/providers/types.js';
 import { BattleMediator } from './mediator.js';
 import { getModeConfig } from './modes/index.js';
 import { parsePlan, mapStepsToRounds, buildPlanningPrompt, buildExecutionPrompt } from './planner.js';
@@ -78,6 +78,8 @@ interface CreateConfigOptions {
   agentA: string;
   agentB: string;
   mode: BattleMode;
+  modelA?: string;
+  modelB?: string;
   task?: string;
   topic?: string;
   maxRounds?: number;
@@ -93,6 +95,8 @@ export class BattleEngine {
       mode: options.mode,
       agentA: options.agentA,
       agentB: options.agentB,
+      modelA: options.modelA,
+      modelB: options.modelB,
       task: options.task,
       topic: options.topic,
       maxRounds: options.maxRounds ?? DEFAULT_ROUNDS[options.mode],
@@ -123,7 +127,8 @@ export class BattleEngine {
   async runSymmetric(
     config: BattleConfig,
     agentManager: AgentManager,
-    bridge: ClaudeBridge,
+    bridgeA: ProviderBridge,
+    bridgeB: ProviderBridge,
     effort?: string,
     onProgress?: BattleProgressCallback,
   ): Promise<BattleResult> {
@@ -158,8 +163,8 @@ export class BattleEngine {
       let rawPlanB: string;
       try {
         [rawPlanA, rawPlanB] = await Promise.all([
-          bridge.runAndCapture(bridge.buildBattleArgs(planOptsA), 120_000, bridge.buildBattleStdin(planOptsA), planDirA),
-          bridge.runAndCapture(bridge.buildBattleArgs(planOptsB), 120_000, bridge.buildBattleStdin(planOptsB), planDirB),
+          bridgeA.runAndCapture(bridgeA.buildBattleArgs(planOptsA), 120_000, bridgeA.buildBattleStdin(planOptsA), planDirA),
+          bridgeB.runAndCapture(bridgeB.buildBattleArgs(planOptsB), 120_000, bridgeB.buildBattleStdin(planOptsB), planDirB),
         ]);
       } finally {
         rmSync(planDirA, { recursive: true, force: true });
@@ -221,9 +226,9 @@ export class BattleEngine {
 
         const startTime = Date.now();
         const [resultA, resultB] = await Promise.all([
-          bridge.runAndCapture(bridge.buildBattleArgs(optsA), 600_000, bridge.buildBattleStdin(optsA), tempDirA)
+          bridgeA.runAndCapture(bridgeA.buildBattleArgs(optsA), 600_000, bridgeA.buildBattleStdin(optsA), tempDirA)
             .then(r => ({ response: r, elapsedMs: Date.now() - startTime })),
-          bridge.runAndCapture(bridge.buildBattleArgs(optsB), 600_000, bridge.buildBattleStdin(optsB), tempDirB)
+          bridgeB.runAndCapture(bridgeB.buildBattleArgs(optsB), 600_000, bridgeB.buildBattleStdin(optsB), tempDirB)
             .then(r => ({ response: r, elapsedMs: Date.now() - startTime })),
         ]);
         const rawResponseA = resultA.response;
@@ -256,7 +261,8 @@ export class BattleEngine {
   async runAsymmetric(
     config: BattleConfig,
     agentManager: AgentManager,
-    bridge: ClaudeBridge,
+    bridgeA: ProviderBridge,
+    bridgeB: ProviderBridge,
     effort?: string,
     onProgress?: BattleProgressCallback,
   ): Promise<BattleResult> {
@@ -288,8 +294,8 @@ export class BattleEngine {
         const optsA = { systemPrompt: identityA, prompt: turnPromptA, effort, dangerouslySkipPermissions: true };
         if (onProgress) onProgress({ phase: 'round', type: 'info', agent: config.agentA, round });
         const startA = Date.now();
-        const rawResponseA = await bridge.runAndCapture(
-          bridge.buildBattleArgs(optsA), undefined, bridge.buildBattleStdin(optsA), tempDirA,
+        const rawResponseA = await bridgeA.runAndCapture(
+          bridgeA.buildBattleArgs(optsA), undefined, bridgeA.buildBattleStdin(optsA), tempDirA,
         );
         if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentA, round, elapsedMs: Date.now() - startA, message: rawResponseA });
         const responseA = rawResponseA + collectGeneratedFiles(tempDirA);
@@ -305,8 +311,8 @@ export class BattleEngine {
         const asymOptsB = { systemPrompt: identityB, prompt: turnPromptB, effort, dangerouslySkipPermissions: true };
         if (onProgress) onProgress({ phase: 'round', type: 'info', agent: config.agentB, round });
         const startB = Date.now();
-        const rawResponseB = await bridge.runAndCapture(
-          bridge.buildBattleArgs(asymOptsB), undefined, bridge.buildBattleStdin(asymOptsB), tempDirB,
+        const rawResponseB = await bridgeB.runAndCapture(
+          bridgeB.buildBattleArgs(asymOptsB), undefined, bridgeB.buildBattleStdin(asymOptsB), tempDirB,
         );
         if (onProgress) onProgress({ phase: 'round', type: 'complete', agent: config.agentB, round, elapsedMs: Date.now() - startB, message: rawResponseB });
         const responseB = rawResponseB + collectGeneratedFiles(tempDirB);

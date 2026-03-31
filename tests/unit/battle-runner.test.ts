@@ -24,6 +24,8 @@ function makeConfigManager(battlesDir: string) {
     agentsDir: join(battlesDir, '..', 'agents'),
     reportsDir: join(battlesDir, '..', 'reports'),
     root: join(battlesDir, '..'),
+    load: () => ({}),
+    ensureDirectories: () => {},
   } as unknown as import('../../src/core/config.js').ConfigManager;
 }
 
