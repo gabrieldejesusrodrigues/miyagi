@@ -15,6 +15,7 @@ pnpm build          # Build with tsup -> dist/bin/miyagi.js
 pnpm test           # Run all tests with vitest
 pnpm lint           # TypeScript strict check (tsc --noEmit)
 pnpm test -- tests/unit/config.test.ts   # Run single test file
+pnpm test -- tests/unit/model-spec.test.ts   # Run a specific test
 ```
 
 All three must pass before committing. Run `pnpm test` after every change.
@@ -30,6 +31,7 @@ src/
     display/                     # Terminal output formatters
     middleware/                   # Security validators for import/export
   core/                          # Stateless managers (config, agent, skill, session, etc.)
+    providers/                   # ProviderBridge interface + Claude/Gemini/Codex implementations
   battle/                        # BattleEngine, BattleMediator, modes/, background, runner
   training/                      # Judge, Coach, scoring, history
   reports/                       # Handlebars HTML generator + templates + CSS
@@ -51,12 +53,22 @@ Each directory is an independent area. Agents working on one area should not nee
 - `agent-manager.ts` — AgentManager: CRUD for agents in `~/.miyagi/agents/`
 - `skill-manager.ts` — SkillManager: list/install/remove skills per agent. Installs by cloning GitHub repos to temp dir, discovering skills via `SKILL.md`, copying to agent's `skills/` dir. Supports interactive multi-select and `--skill` flag. Uses ClaudeBridge (sonnet) to update agent's `identity.md` with skill directives after installation.
 - `session-manager.ts` — SessionManager: records Claude session history
-- `claude-bridge.ts` — ClaudeBridge: spawns `claude` CLI processes, builds arg arrays. Supports `cwd` parameter for isolated workspaces.
-- `impersonation.ts` — ImpersonationManager: symlinks skills, builds system prompt, cleanup traps
+- `claude-bridge.ts` — Re-exports from providers/ for backward compatibility
+- `impersonation.ts` — ImpersonationManager: builds system prompt, delegates skill setup to ProviderBridge. Constructor takes AgentManager only (no claudeSkillsDir).
 - `template-loader.ts` — TemplateLoader: lists/loads/applies built-in and user-installed templates. Supports `install()` (from directory source), `createFromAgent()` (extract template from agent), `delete()` (remove user template). Merges built-in + user template directories in `list()`.
 - `claude-flags.ts` — Claude Code flag pass-through parser
 
 **Tests:** `tests/unit/config.test.ts`, `agent-manager.test.ts`, `skill-manager.test.ts`, `session-manager.test.ts`, `claude-bridge.test.ts`, `impersonation.test.ts`, `core-edge-cases.test.ts`, `template-install-create.test.ts`
+
+### `src/core/providers/` — Provider Bridges
+- `types.ts` — ProviderBridge interface definition
+- `claude-bridge.ts` — ClaudeBridge: `--print`, `--append-system-prompt`, `--dangerously-skip-permissions`, symlink skills to `~/.claude/commands/`
+- `gemini-bridge.ts` — GeminiBridge: `-p` non-interactive, `--yolo`, TOML skills to `~/.gemini/commands/`
+- `codex-bridge.ts` — CodexBridge: `exec` subcommand, `-c instructions=`, `--yolo`
+- `factory.ts` — `createBridge(ModelSpec)` returns correct bridge for provider
+- `index.ts` — barrel export
+
+**Tests:** `tests/unit/claude-bridge.test.ts`, `claude-bridge-mock.test.ts`, `gemini-bridge.test.ts`, `codex-bridge.test.ts`, `provider-factory.test.ts`, `model-spec.test.ts`
 
 ### `src/battle/` — Battle System
 - `engine.ts` — BattleEngine: creates configs, assembles results, validates modes. Runs agents in isolated temp directories (`/tmp/miyagi-battle-*`) with `--dangerously-skip-permissions` so agents can write and execute code. Persistent workspaces across rounds (agents build on their work). Collects generated files (up to 30KB) from the final workspace state and appends to the last round response. 10-minute timeout per agent call. Cleanup via `finally` blocks. Symmetric battles include a planning phase (round 0) before execution rounds.
@@ -86,6 +98,7 @@ Each directory is an independent area. Agents working on one area should not nee
   - `templates.ts` — list, install (from directory, `--force`), create (from agent, `--from` or interactive), delete
   - `report.ts` — Generate HTML reports: `--type profile` (agent stats) or `--type battle` (from saved battle data)
   - `use.ts`, `stats.ts`, `skill.ts`, `export-import.ts`, `sessions.ts`, `miyagi-help.ts`
+  - `config.ts` — `miyagi config get/set/list/reset` for managing global configuration
 - `display/stats-display.ts` — Terminal stats rendering (pure string formatting)
 - `middleware/security.ts` — Archive entry validation (path traversal, symlinks, size)
 
@@ -135,6 +148,14 @@ Each directory is an independent area. Agents working on one area should not nee
 2. Register in `src/cli/program.ts` (import + call register function)
 3. Wire to core modules (ConfigManager, AgentManager, etc.)
 4. Add command name check in `tests/unit/cli-program.test.ts`
+
+### Adding a new provider
+1. Create bridge in `src/core/providers/` implementing `ProviderBridge`
+2. Add to factory in `src/core/providers/factory.ts`
+3. Add provider name to `ProviderName` union in `src/types/provider.ts`
+4. Add to `VALID_PROVIDERS` set in `src/types/provider.ts`
+5. Write tests in `tests/unit/`
+6. Update `src/core/providers/index.ts` barrel export
 
 ### Adding a battle mode
 1. Create config file in `src/battle/modes/`
