@@ -1,10 +1,13 @@
 import { spawn, execSync, type ChildProcess } from 'child_process';
+import { existsSync, mkdirSync, cpSync, rmSync, readdirSync } from 'fs';
+import { join } from 'path';
 import type { ProviderBridge } from './types.js';
 import type { SessionOptions, BattleAgentOptions } from '../../types/provider.js';
 
 export class CodexBridge implements ProviderBridge {
   readonly provider = 'codex' as const;
   private binaryPath: string;
+  private activeSkillDirs: string[] = [];
 
   constructor(binaryPath?: string) {
     this.binaryPath = binaryPath ?? this.findBinaryPath();
@@ -19,7 +22,6 @@ export class CodexBridge implements ProviderBridge {
   }
 
   buildSessionArgs(opts: SessionOptions): string[] {
-    // Codex interactive TUI mode
     const args: string[] = [];
 
     if (opts.model) {
@@ -28,6 +30,10 @@ export class CodexBridge implements ProviderBridge {
 
     if (opts.dangerouslySkipPermissions) {
       args.push('--yolo');
+    }
+
+    if (opts.cwd) {
+      args.push('--cd', opts.cwd);
     }
 
     // System prompt via -c instructions="..."
@@ -123,14 +129,32 @@ export class CodexBridge implements ProviderBridge {
     });
   }
 
-  async setupSkills(_agentName: string, _skillsDir: string): Promise<void> {
-    // Codex skills are configured via config.toml [[skills.config]] entries.
-    // For now, we skip skill setup for Codex since it requires modifying
-    // ~/.codex/config.toml which has a TOML format that's more complex to manage.
-    // Skills content is instead injected via the system prompt.
+  async setupSkills(agentName: string, skillsDir: string): Promise<void> {
+    // Codex discovers skills from .agents/skills/ in the working directory.
+    // We copy agent skills to a prefixed directory under .agents/skills/.
+    if (!existsSync(skillsDir)) return;
+
+    const cwd = process.cwd();
+    const agentsSkillsDir = join(cwd, '.agents', 'skills');
+
+    for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const skillSrc = join(skillsDir, entry.name);
+      const skillDest = join(agentsSkillsDir, `miyagi-${agentName}-${entry.name}`);
+
+      if (!existsSync(agentsSkillsDir)) mkdirSync(agentsSkillsDir, { recursive: true });
+      if (existsSync(skillDest)) rmSync(skillDest, { recursive: true, force: true });
+      cpSync(skillSrc, skillDest, { recursive: true });
+      this.activeSkillDirs.push(skillDest);
+    }
   }
 
   async cleanupSkills(): Promise<void> {
-    // No-op — skills injected via system prompt, no files to clean up
+    for (const dir of this.activeSkillDirs) {
+      if (existsSync(dir)) {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+    this.activeSkillDirs = [];
   }
 }

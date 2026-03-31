@@ -22,10 +22,12 @@ describe('GeminiBridge', () => {
       expect(args).toContain('gemini-2.5-pro');
     });
 
-    it('includes --yolo for dangerouslySkipPermissions', () => {
+    it('includes --approval-mode yolo for dangerouslySkipPermissions', () => {
       const bridge = new GeminiBridge('echo');
       const args = bridge.buildSessionArgs({ systemPrompt: 'test', dangerouslySkipPermissions: true });
-      expect(args).toContain('--yolo');
+      expect(args).toContain('--approval-mode');
+      expect(args).toContain('yolo');
+      expect(args).not.toContain('--yolo');
     });
 
     it('includes --prompt-interactive with system prompt', () => {
@@ -64,10 +66,12 @@ describe('GeminiBridge', () => {
       expect(args).toContain('gemini-2.5-flash');
     });
 
-    it('includes --yolo for skip permissions', () => {
+    it('includes --approval-mode yolo for skip permissions', () => {
       const bridge = new GeminiBridge('echo');
       const args = bridge.buildBattleArgs({ systemPrompt: 'sys', prompt: 'task', dangerouslySkipPermissions: true });
-      expect(args).toContain('--yolo');
+      expect(args).toContain('--approval-mode');
+      expect(args).toContain('yolo');
+      expect(args).not.toContain('--yolo');
     });
 
     it('does not include system prompt in args', () => {

@@ -1,7 +1,7 @@
 import { spawn, execSync, type ChildProcess } from 'child_process';
 import { existsSync, writeFileSync, unlinkSync, readdirSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
+import { homedir, tmpdir } from 'os';
 import type { ProviderBridge } from './types.js';
 import type { SessionOptions, BattleAgentOptions } from '../../types/provider.js';
 
@@ -9,6 +9,7 @@ export class GeminiBridge implements ProviderBridge {
   readonly provider = 'gemini' as const;
   private binaryPath: string;
   private activeSkillFiles: string[] = [];
+  private tempSystemPromptFile: string | null = null;
 
   constructor(binaryPath?: string) {
     this.binaryPath = binaryPath ?? this.findBinaryPath();
@@ -30,7 +31,7 @@ export class GeminiBridge implements ProviderBridge {
     }
 
     if (opts.dangerouslySkipPermissions) {
-      args.push('--yolo');
+      args.push('--approval-mode', 'yolo');
     }
 
     if (opts.resumeSession && opts.resumeSession !== 'latest') {
@@ -43,9 +44,8 @@ export class GeminiBridge implements ProviderBridge {
       args.push(...opts.extraArgs);
     }
 
-    // Gemini uses GEMINI.md for system prompts, not a CLI flag.
-    // The system prompt will be passed via stdin in interactive mode
-    // using --prompt-interactive to seed the session.
+    // Gemini uses --prompt-interactive to seed the session with system instructions
+    // while keeping the interactive REPL open for follow-up conversation.
     if (opts.systemPrompt) {
       args.push('--prompt-interactive', `Follow these instructions for our entire conversation:\n\n${opts.systemPrompt}`);
     }
@@ -54,7 +54,6 @@ export class GeminiBridge implements ProviderBridge {
   }
 
   buildBattleArgs(opts: BattleAgentOptions): string[] {
-    // Gemini uses -p/--prompt for non-interactive mode
     const args: string[] = [];
 
     if (opts.model) {
@@ -62,25 +61,47 @@ export class GeminiBridge implements ProviderBridge {
     }
 
     if (opts.dangerouslySkipPermissions) {
-      args.push('--yolo');
+      args.push('--approval-mode', 'yolo');
     }
 
-    // -p flag forces non-interactive mode and is set via stdin
-    // We pass an empty -p so gemini reads from stdin
+    // -p flag forces non-interactive mode.
+    // Stdin content is prepended to the -p argument value.
+    // We pass an empty -p so the full prompt comes from stdin.
     args.push('-p', '');
 
     return args;
   }
 
   buildBattleStdin(opts: BattleAgentOptions): string {
-    // Combine system prompt and user prompt into stdin
-    // Gemini reads stdin content prepended to the -p flag content
+    // Gemini prepends stdin content to the -p flag value.
+    // We embed the system prompt + user prompt together in stdin.
     let input = '';
     if (opts.systemPrompt) {
       input += `<SYSTEM_INSTRUCTIONS>\n${opts.systemPrompt}\n</SYSTEM_INSTRUCTIONS>\n\n`;
     }
     input += opts.prompt;
     return input;
+  }
+
+  /**
+   * Build environment variables for the subprocess.
+   * Uses GEMINI_SYSTEM_MD to inject system prompt via a temp file
+   * when running in non-interactive (battle) mode.
+   */
+  private buildEnv(systemPrompt?: string, cwd?: string): Record<string, string | undefined> {
+    const env = { ...process.env };
+
+    if (systemPrompt) {
+      // Write system prompt to a temp file and point GEMINI_SYSTEM_MD at it.
+      // This is the official mechanism for system prompt injection in Gemini CLI.
+      const tempDir = cwd ?? tmpdir();
+      const systemPromptPath = join(tempDir, '.miyagi-gemini-system.md');
+      writeFileSync(systemPromptPath, systemPrompt);
+      env['GEMINI_SYSTEM_MD'] = systemPromptPath;
+      this.tempSystemPromptFile = systemPromptPath;
+    }
+
+    return env;
   }
 
   spawnInteractive(args: string[]): ChildProcess {
@@ -120,6 +141,11 @@ export class GeminiBridge implements ProviderBridge {
 
       child.on('close', (code) => {
         clearTimeout(timer);
+        // Clean up temp system prompt file if created
+        if (this.tempSystemPromptFile && existsSync(this.tempSystemPromptFile)) {
+          try { unlinkSync(this.tempSystemPromptFile); } catch { /* ignore */ }
+          this.tempSystemPromptFile = null;
+        }
         if (killed) {
           reject(new Error(`Gemini process timed out after ${timeout}ms`));
         } else if (code === 0) {
@@ -148,10 +174,8 @@ export class GeminiBridge implements ProviderBridge {
       if (!existsSync(skillMdPath)) continue;
 
       const content = readFileSync(skillMdPath, 'utf-8');
-      // Extract description from frontmatter
       const descMatch = content.match(/^description:\s*["']?(.+?)["']?\s*$/m);
       const description = descMatch?.[1] ?? '';
-      // Extract body after frontmatter
       const bodyMatch = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
       const body = bodyMatch?.[1]?.trim() ?? content;
 

@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 import { CodexBridge } from '../../src/core/providers/codex-bridge.js';
 
 describe('CodexBridge', () => {
@@ -28,6 +31,13 @@ describe('CodexBridge', () => {
       const cIdx = args.indexOf('-c');
       expect(args[cIdx + 1]).toContain('instructions=');
       expect(args[cIdx + 1]).toContain('You are a dev agent');
+    });
+
+    it('includes --cd for working directory', () => {
+      const bridge = new CodexBridge('echo');
+      const args = bridge.buildSessionArgs({ systemPrompt: 'test', cwd: '/tmp/workspace' });
+      expect(args).toContain('--cd');
+      expect(args).toContain('/tmp/workspace');
     });
 
     it('includes extra args', () => {
@@ -82,16 +92,51 @@ describe('CodexBridge', () => {
   });
 
   describe('setupSkills', () => {
-    it('does not throw', async () => {
+    let tempDir: string;
+    const originalCwd = process.cwd();
+
+    beforeEach(() => {
+      tempDir = mkdtempSync(join(tmpdir(), 'miyagi-codex-test-'));
+      process.chdir(tempDir);
+    });
+
+    afterEach(() => {
+      process.chdir(originalCwd);
+      rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('does not throw for nonexistent skills dir', async () => {
       const bridge = new CodexBridge('echo');
       await expect(bridge.setupSkills('test', '/nonexistent')).resolves.toBeUndefined();
     });
-  });
 
-  describe('cleanupSkills', () => {
-    it('does not throw', async () => {
+    it('copies skills to .agents/skills/ in cwd', async () => {
       const bridge = new CodexBridge('echo');
-      await expect(bridge.cleanupSkills()).resolves.toBeUndefined();
+      const skillsDir = join(tempDir, 'agent-skills');
+      const skillDir = join(skillsDir, 'my-skill');
+      mkdirSync(skillDir, { recursive: true });
+      writeFileSync(join(skillDir, 'SKILL.md'), '---\nname: my-skill\ndescription: test\n---\nContent');
+
+      await bridge.setupSkills('test-agent', skillsDir);
+
+      const destDir = join(tempDir, '.agents', 'skills', 'miyagi-test-agent-my-skill');
+      expect(existsSync(destDir)).toBe(true);
+      expect(existsSync(join(destDir, 'SKILL.md'))).toBe(true);
+    });
+
+    it('cleans up skill dirs on cleanupSkills', async () => {
+      const bridge = new CodexBridge('echo');
+      const skillsDir = join(tempDir, 'agent-skills');
+      const skillDir = join(skillsDir, 'my-skill');
+      mkdirSync(skillDir, { recursive: true });
+      writeFileSync(join(skillDir, 'SKILL.md'), '---\nname: my-skill\ndescription: test\n---\nContent');
+
+      await bridge.setupSkills('test-agent', skillsDir);
+      const destDir = join(tempDir, '.agents', 'skills', 'miyagi-test-agent-my-skill');
+      expect(existsSync(destDir)).toBe(true);
+
+      await bridge.cleanupSkills();
+      expect(existsSync(destDir)).toBe(false);
     });
   });
 
