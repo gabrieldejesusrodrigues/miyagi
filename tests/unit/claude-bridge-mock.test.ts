@@ -32,8 +32,7 @@ describe('ClaudeBridge', () => {
       const bridge = new ClaudeBridge('echo');
       const args = bridge.buildSessionArgs({
         systemPrompt: 'prompt',
-        resume: true,
-        sessionId: 'abc-123',
+        resumeSession: 'abc-123',
       });
       expect(args).toContain('--resume');
       expect(args).toContain('abc-123');
@@ -43,15 +42,15 @@ describe('ClaudeBridge', () => {
       const bridge = new ClaudeBridge('echo');
       const args = bridge.buildSessionArgs({
         systemPrompt: 'prompt',
-        resume: true,
+        resumeSession: 'latest',
       });
       expect(args).toContain('--resume');
       expect(args).not.toContain('abc-123');
     });
 
-    it('should not add resume when false', () => {
+    it('should not add resume when omitted', () => {
       const bridge = new ClaudeBridge('echo');
-      const args = bridge.buildSessionArgs({ systemPrompt: 'prompt', resume: false });
+      const args = bridge.buildSessionArgs({ systemPrompt: 'prompt' });
       expect(args).not.toContain('--resume');
     });
 

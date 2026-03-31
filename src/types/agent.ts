@@ -7,6 +7,7 @@ export interface AgentManifest {
   updatedAt?: string;
   description?: string;
   domains?: string[];
+  model?: string;
 }
 
 export interface Agent {

@@ -53,7 +53,7 @@ describe('BattleEngine progress callbacks', () => {
     const events: BattleProgressEvent[] = [];
     const onProgress = (event: BattleProgressEvent) => { events.push(event); };
 
-    await engine.runSymmetric(config, agentManager, bridge, undefined, onProgress);
+    await engine.runSymmetric(config, agentManager, bridge, bridge, undefined, onProgress);
 
     // planning phase event first
     expect(events[0]).toMatchObject({ phase: 'setup', type: 'info', message: 'Planning phase' });
@@ -100,7 +100,7 @@ describe('BattleEngine progress callbacks', () => {
     const events: BattleProgressEvent[] = [];
     const onProgress = (event: BattleProgressEvent) => { events.push(event); };
 
-    await engine.runAsymmetric(config, agentManager, bridge, undefined, onProgress);
+    await engine.runAsymmetric(config, agentManager, bridge, bridge, undefined, onProgress);
 
     // round/start first
     expect(events[0]).toMatchObject({ phase: 'round', type: 'start', round: 1, totalRounds: 1 });
@@ -144,7 +144,7 @@ describe('BattleEngine progress callbacks', () => {
       maxRounds: 1,
     });
 
-    await expect(engine.runSymmetric(config, agentManager, bridge)).resolves.toBeDefined();
+    await expect(engine.runSymmetric(config, agentManager, bridge, bridge)).resolves.toBeDefined();
   });
 
   it('runAsymmetric works without onProgress (no crash)', async () => {
@@ -163,7 +163,7 @@ describe('BattleEngine progress callbacks', () => {
       maxRounds: 1,
     });
 
-    await expect(engine.runAsymmetric(config, agentManager, bridge)).resolves.toBeDefined();
+    await expect(engine.runAsymmetric(config, agentManager, bridge, bridge)).resolves.toBeDefined();
   });
 
   it('runSymmetric fires progress events for each round in multi-round battle', async () => {
@@ -185,7 +185,7 @@ describe('BattleEngine progress callbacks', () => {
     const events: BattleProgressEvent[] = [];
     const onProgress = (event: BattleProgressEvent) => { events.push(event); };
 
-    await engine.runSymmetric(config, agentManager, bridge, undefined, onProgress);
+    await engine.runSymmetric(config, agentManager, bridge, bridge, undefined, onProgress);
 
     const startEvents = events.filter(e => e.type === 'start');
     expect(startEvents).toHaveLength(3);

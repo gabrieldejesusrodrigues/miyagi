@@ -1,8 +1,8 @@
 import type { Command } from 'commander';
-import { readFileSync } from 'fs';
 import { ConfigManager } from '../../core/config.js';
 import { AgentManager } from '../../core/agent-manager.js';
-import { ClaudeBridge } from '../../core/claude-bridge.js';
+import { createBridge } from '../../core/providers/factory.js';
+import { parseModelSpec } from '../../types/provider.js';
 import { Coach } from '../../training/coach.js';
 import { HistoryManager } from '../../training/history.js';
 import simpleGit from 'simple-git';
@@ -17,6 +17,7 @@ export function registerTrainCommand(program: Command): void {
     .action(async (agentName, options) => {
       const config = new ConfigManager();
       config.ensureDirectories();
+      const globalConfig = config.load();
       const agentManager = new AgentManager(config, process.cwd());
       const coach = new Coach(agentManager);
       const history = new HistoryManager(agentManager);
@@ -59,7 +60,9 @@ export function registerTrainCommand(program: Command): void {
         // Load recent battle context
         const agentFiles = await coach.getAgentFiles(agentName);
 
-        const bridge = new ClaudeBridge();
+        // Resolve coach bridge from config
+        const coachSpec = parseModelSpec(globalConfig.coach?.model ?? 'claude/sonnet');
+        const bridge = createBridge(coachSpec);
         const coachIdentity = coach.getIdentity();
 
         // Build a coaching prompt that asks Mr. Miyagi to analyze the agent

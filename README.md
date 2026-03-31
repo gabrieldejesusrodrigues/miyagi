@@ -46,6 +46,8 @@ npm install -g miyagi-cli
 **Requirements:**
 - Node.js >= 18
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed (`npm install -g @anthropic-ai/claude-code`)
+- Gemini CLI (optional — only needed for `gemini/*` models): `npm install -g @google/gemini-cli`
+- Codex CLI (optional — only needed for `codex/*` models): `npm install -g @openai/codex`
 
 <br />
 
@@ -90,6 +92,7 @@ miyagi report my-salesman --type profile
 | Command | Description |
 |:--------|:------------|
 | `miyagi use <agent>` | Launch a Claude Code session as your agent |
+| `miyagi use <agent> --model <model>` | Launch session with a specific provider/model |
 | `miyagi use <agent> --resume` | Resume the last session for an agent |
 | `miyagi sessions <agent>` | List past sessions |
 
@@ -102,6 +105,8 @@ When you `use` an agent, Miyagi injects the agent's identity, context files, and
 | `miyagi battle <a> <b>` | Battle two agents (defaults to `same-task` mode) |
 | `miyagi battle <a> <b> --mode debate --topic "tabs vs spaces"` | Battle with a specific mode and topic |
 | `miyagi battle <a> <b> --effort low` | Battle with a specific effort level (low, medium, high, max) |
+| `miyagi battle <a> <b> --model <model>` | Battle with a specific provider/model for both agents |
+| `miyagi battle <a> <b> --model-a <m> --model-b <m>` | Battle with different providers per agent |
 | `miyagi battle <a> <b> --background` | Run battle in background (returns immediately) |
 | `miyagi battle status <id>` | Check progress of a background battle |
 | `miyagi battle status` | List all recent background battles with status |
@@ -136,6 +141,9 @@ When you `use` an agent, Miyagi injects the agent's identity, context files, and
 | `miyagi export <agent>` | Export agent as `.tar.gz` or `.zip` |
 | `miyagi import <file>` | Import an agent package |
 | `miyagi templates list` | List available agent templates |
+| `miyagi config set <key> <value>` | Set configuration (e.g., `defaultModel`, `judge.model`) |
+| `miyagi config get <key>` | Get a configuration value |
+| `miyagi config list` | List all configuration |
 
 <br />
 
@@ -290,13 +298,69 @@ miyagi create agent my-agent
 
 <br />
 
-## Claude Code Integration
+## Multi-Provider Support
 
-Miyagi wraps Claude Code and passes through all its flags transparently:
+Miyagi supports multiple AI providers — Claude Code, Gemini CLI, and Codex CLI — using a unified `provider/model` format.
+
+### Model Format
+
+Models are specified as `provider/model`:
+
+| Provider | Example | Notes |
+|:---------|:--------|:------|
+| `claude` (default) | `claude/opus`, `claude/sonnet` | Requires Claude Code |
+| `gemini` | `gemini/gemini-2.5-pro`, `gemini/gemini-2.0-flash` | Requires Gemini CLI |
+| `codex` | `codex/o4-mini`, `codex/o3` | Requires Codex CLI |
+
+### Resolution Priority
+
+Model selection follows this priority order (highest to lowest):
+
+1. CLI flag (`--model`, `--model-a`, `--model-b`)
+2. Agent manifest (`manifest.json` → `model` field)
+3. Global config (`miyagi config set defaultModel`)
+4. Default: `claude/sonnet`
+
+### Per-Agent Configuration
+
+Set the model directly in an agent's `manifest.json`:
+
+```json
+{
+  "name": "my-gemini-agent",
+  "model": "gemini/gemini-2.5-pro"
+}
+```
+
+### Global Configuration
+
+```bash
+# Set default model for all agents
+miyagi config set defaultModel gemini/gemini-2.5-pro
+
+# Set model used by the judge
+miyagi config set judge.model claude/opus
+```
+
+### Mixed-Provider Battle
+
+```bash
+# Agent A uses Gemini, Agent B uses Codex
+miyagi battle my-agent rival-agent --model-a gemini/gemini-2.5-pro --model-b codex/o4-mini
+```
+
+<br />
+
+## Provider Integration
+
+Miyagi wraps Claude Code (and other supported CLI providers) and passes through all their flags transparently:
 
 ```bash
 # Use a specific model and effort level
-miyagi use my-agent --model opus --effort high
+miyagi use my-agent --model claude/opus --effort high
+
+# Battle with different providers per agent
+miyagi battle agent-a agent-b --model-a gemini/gemini-2.5-pro --model-b codex/o4-mini
 
 # Run in a git worktree for isolation
 miyagi use my-agent --worktree
@@ -305,7 +369,15 @@ miyagi use my-agent --worktree
 miyagi battle a b --dangerously-skip-permissions
 ```
 
-Any flag that Claude Code supports, Miyagi supports.
+### Supported Providers
+
+| Provider | Binary | Install |
+|:---------|:-------|:--------|
+| Claude Code (default) | `claude` | `npm install -g @anthropic-ai/claude-code` |
+| Gemini CLI | `gemini` | `npm install -g @google/gemini-cli` |
+| Codex CLI | `codex` | `npm install -g @openai/codex` |
+
+Any flag that the underlying provider CLI supports, Miyagi passes through.
 
 <br />
 

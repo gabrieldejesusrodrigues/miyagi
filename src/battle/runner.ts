@@ -3,7 +3,8 @@ import { join } from 'path';
 import { ConfigManager } from '../core/config.js';
 import { AgentManager } from '../core/agent-manager.js';
 import { BattleEngine } from './engine.js';
-import { ClaudeBridge } from '../core/claude-bridge.js';
+import { createBridge } from '../core/providers/factory.js';
+import { resolveModel, parseModelSpec } from '../types/provider.js';
 import { Judge } from '../training/judge.js';
 import { Coach } from '../training/coach.js';
 import { HistoryManager } from '../training/history.js';
@@ -33,10 +34,10 @@ export async function runBattleBackground(
     // Read config
     const bgConfig: BackgroundBattleConfig = JSON.parse(readFileSync(configPath, 'utf-8'));
     const { battleConfig, effort } = bgConfig;
+    const globalConfig = configManager.load();
 
     const agentManager = new AgentManager(configManager, process.cwd());
     const engine = new BattleEngine();
-    const bridge = new ClaudeBridge();
     const history = new HistoryManager(agentManager);
     const onProgress = createFileProgressCallback(progressPath);
 
@@ -46,30 +47,39 @@ export async function runBattleBackground(
     if (!agentA) throw new Error(`Agent "${battleConfig.agentA}" not found`);
     if (!agentB) throw new Error(`Agent "${battleConfig.agentB}" not found`);
 
+    // Resolve models per agent from BattleConfig
+    const specA = resolveModel(battleConfig.modelA, agentA.manifest, globalConfig);
+    const specB = resolveModel(battleConfig.modelB, agentB.manifest, globalConfig);
+    const bridgeA = createBridge(specA);
+    const bridgeB = createBridge(specB);
+
     // Run battle
     const modeConfig = getModeConfig(battleConfig.mode);
     onProgress({ phase: 'setup', type: 'start', message: `${battleConfig.agentA} vs ${battleConfig.agentB}` });
 
     const result = modeConfig.type === 'symmetric'
-      ? await engine.runSymmetric(battleConfig, agentManager, bridge, effort, onProgress)
-      : await engine.runAsymmetric(battleConfig, agentManager, bridge, effort, onProgress);
+      ? await engine.runSymmetric(battleConfig, agentManager, bridgeA, bridgeB, effort, onProgress)
+      : await engine.runAsymmetric(battleConfig, agentManager, bridgeA, bridgeB, effort, onProgress);
 
-    // Judge
+    // Judge — uses its own bridge from config
+    const judgeSpec = parseModelSpec(globalConfig.judge?.model ?? 'claude/opus');
+    const judgeBridge = createBridge(judgeSpec);
+
     onProgress({ phase: 'judge', type: 'start' });
     const judge = new Judge();
     const evalPrompt = judge.buildEvaluationPrompt(result);
     const judgeOpts = {
       systemPrompt: judge.getIdentity(),
       prompt: evalPrompt,
-      model: 'opus',
+      model: judgeSpec.model,
       effort: ['high', 'max'].includes(effort) ? effort : 'medium',
     };
 
     let verdict!: JudgeVerdict;
     const maxRetries = 2;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      const verdictRaw = await bridge.runAndCapture(
-        bridge.buildBattleArgs(judgeOpts), 600_000, bridge.buildBattleStdin(judgeOpts),
+      const verdictRaw = await judgeBridge.runAndCapture(
+        judgeBridge.buildBattleArgs(judgeOpts), 600_000, judgeBridge.buildBattleStdin(judgeOpts),
       );
       try {
         verdict = judge.parseVerdict(verdictRaw);
@@ -87,8 +97,11 @@ export async function runBattleBackground(
     await history.updateStats(battleConfig.agentB, result, verdict);
     history.saveBattleData(configManager.reportsDir, battleConfig.id, result, verdict);
 
-    // Auto-coach both agents
+    // Auto-coach both agents — coach uses its own bridge from config
+    const coachSpec = parseModelSpec(globalConfig.coach?.model ?? 'claude/sonnet');
+    const coachBridge = createBridge(coachSpec);
     const coach = new Coach(agentManager);
+
     for (const trainAgent of [battleConfig.agentA, battleConfig.agentB]) {
       try {
         onProgress({ phase: 'coach', type: 'start', agent: trainAgent });
@@ -108,7 +121,7 @@ export async function runBattleBackground(
         const coachOpts = { systemPrompt: coachIdentity, prompt: coachingPrompt, effort: ['high', 'max'].includes(effort) ? effort : 'medium' };
         let coachingResult;
         for (let attempt = 1; attempt <= 2; attempt++) {
-          const rawResponse = await bridge.runAndCapture(bridge.buildBattleArgs(coachOpts), 600_000, bridge.buildBattleStdin(coachOpts));
+          const rawResponse = await coachBridge.runAndCapture(coachBridge.buildBattleArgs(coachOpts), 600_000, coachBridge.buildBattleStdin(coachOpts));
           try {
             coachingResult = coach.parseCoachingResponse(rawResponse);
             break;

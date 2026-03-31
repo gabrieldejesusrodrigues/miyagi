@@ -86,7 +86,7 @@ describe('BattleEngine temp directory management', () => {
     const mockBridge = new MockClaudeBridge();
     const config = makeConfig();
 
-    await engine.runSymmetric(config, mockAgentManager, mockBridge as any);
+    await engine.runSymmetric(config, mockAgentManager, mockBridge as any, mockBridge as any);
 
     // 2 planning calls + 2 execution calls = 4 total
     expect(mockBridge.calls).toHaveLength(4);
@@ -115,7 +115,7 @@ describe('BattleEngine temp directory management', () => {
       return originalRunAndCapture(args, timeout, stdinData, cwd);
     };
 
-    await engine.runSymmetric(config, mockAgentManager, mockBridge as any);
+    await engine.runSymmetric(config, mockAgentManager, mockBridge as any, mockBridge as any);
 
     // Both temp dirs should have been removed
     expect(capturedCwdA).toBeDefined();
@@ -139,7 +139,7 @@ describe('BattleEngine temp directory management', () => {
       throw new Error('Battle failed');
     };
 
-    await expect(engine.runSymmetric(config, mockAgentManager, mockBridge as any)).rejects.toThrow('Battle failed');
+    await expect(engine.runSymmetric(config, mockAgentManager, mockBridge as any, mockBridge as any)).rejects.toThrow('Battle failed');
 
     // Temp dirs should still be cleaned up despite the error
     if (capturedCwdA) expect(existsSync(capturedCwdA)).toBe(false);
@@ -150,7 +150,7 @@ describe('BattleEngine temp directory management', () => {
     const mockBridge = new MockClaudeBridge();
     const config = makeConfig();
 
-    await engine.runSymmetric(config, mockAgentManager, mockBridge as any);
+    await engine.runSymmetric(config, mockAgentManager, mockBridge as any, mockBridge as any);
 
     // Every call should include --dangerously-skip-permissions in args
     for (const call of mockBridge.calls) {
@@ -181,7 +181,7 @@ Write the code.`;
       return 'executed solution';
     };
 
-    const result = await engine.runSymmetric(config, mockAgentManager, mockBridge as any);
+    const result = await engine.runSymmetric(config, mockAgentManager, mockBridge as any, mockBridge as any);
 
     expect(callIndex).toBe(4);
     expect(result.planA).toBeDefined();
@@ -204,7 +204,7 @@ Write the code.`;
       return 'fallback execution';
     };
 
-    const result = await engine.runSymmetric(config, mockAgentManager, mockBridge as any);
+    const result = await engine.runSymmetric(config, mockAgentManager, mockBridge as any, mockBridge as any);
 
     expect(result.rounds).toHaveLength(1);
     expect(result.planA).toBeUndefined();
@@ -245,7 +245,7 @@ Clean up.`;
       return 'round output';
     };
 
-    const result = await engine.runSymmetric(config, mockAgentManager, mockBridge as any);
+    const result = await engine.runSymmetric(config, mockAgentManager, mockBridge as any, mockBridge as any);
 
     expect(result.rounds).toHaveLength(2);
     expect(result.planA).toBeDefined();
@@ -268,7 +268,7 @@ Clean up.`;
       return callIndex <= 2 ? planResponse : 'output';
     };
 
-    await engine.runSymmetric(config, mockAgentManager, mockBridge as any, undefined, (event) => {
+    await engine.runSymmetric(config, mockAgentManager, mockBridge as any, mockBridge as any, undefined, (event) => {
       events.push(event);
     });
 
@@ -292,7 +292,7 @@ Clean up.`;
       return originalRunAndCapture(args, timeout, stdinData, cwd);
     };
 
-    await engine.runAsymmetric(config, mockAgentManager, mockBridge as any);
+    await engine.runAsymmetric(config, mockAgentManager, mockBridge as any, mockBridge as any);
 
     // Both cwds should have been set and cleaned up
     expect(capturedCwdA).toBeDefined();

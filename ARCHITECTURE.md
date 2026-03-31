@@ -58,11 +58,16 @@ ConfigManager ◄──────────────── AgentManager �
      │                              │    │         (reads agent
      │                              │    │          skills dir)
      │                     ImpersonationManager
-     │                         (symlinks skills,
-     │                          builds prompts)
+     │                       (builds prompts,
+     │                        delegates skills
+     │                        to ProviderBridge)
      │
-SessionManager                 ClaudeBridge            TemplateLoader
-(standalone)                  (standalone)             (standalone)
+SessionManager              ProviderBridge             TemplateLoader
+(standalone)                  (interface)              (standalone)
+                           ┌──────┼──────┐
+                     ClaudeBridge  GeminiBridge  CodexBridge
+                     (--print,     (-p,          (exec,
+                      symlinks)    TOML cmds)    -c instructions)
 ```
 
 **ConfigManager** — Root of the dependency tree. Manages `~/.miyagi/` directory structure and `config.json`. All other managers receive it as a constructor parameter. Exposes `agentsDir`, `templatesDir`, `reportsDir`, and `battlesDir` getters.
@@ -75,10 +80,14 @@ SessionManager                 ClaudeBridge            TemplateLoader
 
 **SessionManager** — Persists Claude session records to `sessions.json`. Standalone — depends only on `fs` and `crypto`.
 
-**ClaudeBridge** — Spawns `claude` CLI processes. Builds argument arrays for:
+**ClaudeBridge** — Implements `ProviderBridge`. Spawns `claude` CLI processes. Builds argument arrays for:
 - Interactive sessions (`stdio: 'inherit'` — for `miyagi use`)
 - Non-interactive capture (`stdio: 'pipe'` — for battles and judging)
 Locates the `claude` binary via `which claude`. Supports `cwd` parameter for spawning in isolated temp directories.
+
+**GeminiBridge** — Implements `ProviderBridge` for the Gemini CLI. Uses `-p` flag for non-interactive prompts and TOML-based command configuration. Shares the same `runAndCapture` / `spawnInteractive` interface as ClaudeBridge.
+
+**CodexBridge** — Implements `ProviderBridge` for OpenAI Codex CLI. Uses `exec` mode with `-c` instructions. Shares the same `runAndCapture` / `spawnInteractive` interface as ClaudeBridge.
 
 **ImpersonationManager** — Activates an agent by symlinking its skills into Claude's commands directory with prefixed names (`miyagi-{agent}-{skill}`). Builds system prompts by concatenating `identity.md` + all `context/*.md` files. Registers SIGINT/SIGTERM/exit handlers for cleanup.
 
@@ -210,7 +219,11 @@ battle.ts   ── BattleType, BattleMode (10 literals), BattleModeConfig,
                PlanStep, ExecutionPlan,
                BattleStatus, BackgroundBattleConfig, BackgroundBattleInfo
 scoring.ts  ── DimensionScore, AgentStats, JudgeVerdict, AgentAnalysis
-config.ts   ── MiyagiConfig, SessionEntry
+config.ts   ── MiyagiConfig (includes judge?: { model?: string },
+               coach?: { model?: string }), SessionEntry
+provider.ts ── ProviderName ('claude'|'gemini'|'codex'), ModelSpec,
+               SessionOptions, BattleAgentOptions,
+               parseModelSpec(), resolveModel()
 ```
 
 All modules import types from `../types/index.js`. Types are interfaces/type aliases only — no runtime code.
@@ -224,18 +237,20 @@ All modules import types from `../types/index.js`. Types are interfaces/type ali
          │
 3. Configure: BattleEngine.createConfig() → BattleConfig
          │
+3.5. Resolve models per agent: CLI flag > manifest > config > default
+         │
 4. Execute: Create persistent temp dirs per agent (/tmp/miyagi-battle-*)
          │   Symmetric battles:
          │   ├── Phase 0 (Planning): buildPlanningPrompt() → agents generate plans in parallel
          │   ├── parsePlan() → extract deliverable, approach, steps from each plan
          │   ├── mapStepsToRounds() → distribute steps across execution rounds
          │   ├── For each round: buildExecutionPrompt() with assigned steps + previous outputs
-         │   ├── ClaudeBridge.runAndCapture(cwd=tempDir, --dangerously-skip-permissions)
+         │   ├── bridgeA.runAndCapture(cwd=tempDir, --dangerously-skip-permissions)
          │   └── Falls back to raw task prompt if plan parsing fails
          │   Asymmetric battles:
          │   ├── BattleMediator.buildRolePrompts()
          │   ├── For each round: BattleMediator.buildTurnPrompt() with history
-         │   ├── ClaudeBridge.runAndCapture(cwd=tempDir, --dangerously-skip-permissions)
+         │   ├── bridgeA.runAndCapture / bridgeB.runAndCapture(cwd=tempDir, --dangerously-skip-permissions)
          │   └── BattleMediator.isNaturalEnd() check
          │   After last round:
          │   ├── collectGeneratedFiles(tempDir) → append actual code to last round
@@ -299,14 +314,16 @@ All modules import types from `../types/index.js`. Types are interfaces/type ali
          │
 2. Resolve: AgentManager.get('my-agent')
          │
-3. Activate: ImpersonationManager.activate()
-         │   └── Symlink each skill: agent/skills/X → claude/commands/miyagi-my-agent-X
+2.5. Resolve model from CLI flag > manifest > config > default → create bridge
+         │
+3. Activate: ImpersonationManager.activate(bridge)
+         │   └── Delegates skill setup to bridge
          │   └── Register cleanup traps (SIGINT, SIGTERM, exit)
          │
 4. Prompt: ImpersonationManager.buildSystemPrompt()
          │   └── Read identity.md + all context/*.md files
          │
-5. Launch: ClaudeBridge.spawnInteractive(sessionArgs)
+5. Launch: bridge.spawnInteractive(sessionArgs)
          │   └── --append-system-prompt <identity+context>
          │   └── Pass-through: --model opus
          │
@@ -322,7 +339,7 @@ All modules import types from `../types/index.js`. Types are interfaces/type ali
   sessions.json                     # SessionEntry[]
   agents/
     {agent-name}/
-      manifest.json                 # AgentManifest
+      manifest.json                 # AgentManifest (includes optional model field)
       identity.md                   # Agent personality, strategy, directives
       .installed-skills.json        # InstalledSkillEntry[]
       context/                      # Domain knowledge (.md files)

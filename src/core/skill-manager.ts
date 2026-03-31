@@ -8,7 +8,8 @@ import { tmpdir } from 'os';
 import type { AgentSkill, InstalledSkillEntry } from '../types/index.js';
 import { validateInstalledSkills } from '../utils/validators.js';
 import type { AgentManager } from './agent-manager.js';
-import { ClaudeBridge } from './claude-bridge.js';
+import { createBridge } from './providers/factory.js';
+import { parseModelSpec } from '../types/provider.js';
 
 export interface DiscoveredSkill {
   name: string;
@@ -186,11 +187,12 @@ export class SkillManager {
       '- Output ONLY the complete updated identity.md content, no explanation, no markdown fences.',
     ].join('\n');
 
-    const bridge = new ClaudeBridge();
+    const spec = parseModelSpec('claude/sonnet');
+    const bridge = createBridge(spec);
     const args = bridge.buildBattleArgs({
       systemPrompt: '',
       prompt: '',
-      model: 'sonnet',
+      model: spec.model,
       effort: 'medium',
     });
 

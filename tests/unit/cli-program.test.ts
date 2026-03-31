@@ -26,5 +26,6 @@ describe('CLI Program', () => {
     expect(commandNames).toContain('sessions');
     expect(commandNames).toContain('install');
     expect(commandNames).toContain('update');
+    expect(commandNames).toContain('config');
   });
 });

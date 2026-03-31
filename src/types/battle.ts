@@ -25,6 +25,8 @@ export interface BattleConfig {
   mode: BattleMode;
   agentA: string;
   agentB: string;
+  modelA?: string;
+  modelB?: string;
   task?: string;
   topic?: string;
   maxRounds: number;
